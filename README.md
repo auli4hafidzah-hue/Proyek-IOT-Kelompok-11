@@ -35,4 +35,9 @@ Project ini dibuat dan disimulasikan di [Wokwi](https://wokwi.com/projects/47983
 
 ## Anggota Kelompok 11
 
-*(isi nama anggota kelompok)*
+| Nama | NIM |
+|---|---|
+| Azka Fathiya | G1A024004 |
+| Naifah Amanda Noveni | G1A024017 |
+| Atikah Putri Utami | G1A024027 |
+| Aulia Afdhal Hafidzah | G1A024029 |

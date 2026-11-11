@@ -2,221 +2,93 @@
 #include <DHT.h>
 #include <ArduinoJson.h>
 
-// ==========================================
-// KONFIGURASI PIN THERMOSENSE
-// ==========================================
+/*
+ * =====================================================================
+ * Proyek IoT Kelompok 11
+ * THERMOSENSE : Sistem Monitoring Suhu dan Kelembapan Ruangan
+ * Berbasis ESP32 dengan Indikator LED Otomatis
+ * =====================================================================
+ * Pinout:
+ * - DHT22 Data        : GPIO 4
+ * - LED Indikator     : GPIO 2 (via resistor 220 Ohm)
+ * - Pushbutton Darurat: GPIO 15 (INPUT_PULLUP)
+ * =====================================================================
+ */
 
 #define PIN_DHT 4
 #define TIPE_DHT DHT22
 #define PIN_LED_ALERT 2
 #define PIN_TOMBOL_DARURAT 15
 
-// 0 = Blocking
-// 1 = Non-Blocking
+// Ubah ke 0 untuk menguji mode BLOCKING (delay), 1 untuk NON-BLOCKING (millis)
 #define MODE_NON_BLOCKING 1
 
-// ==========================================
-// KONFIGURASI SISTEM
-// ==========================================
-
 DHT dht(PIN_DHT, TIPE_DHT);
-
 unsigned long waktuBacaTerakhir = 0;
-const unsigned long INTERVAL_TELEMETRI_MS = 2000;
-
+unsigned long intervalTelemetri = 2000; // Default 2000 ms (500 ms saat mode siaga cepat)
 const float AMBANG_SUHU_C = 32.0;
-
 unsigned long nomorPaket = 0;
-
 bool statusTombolSebelumnya = HIGH;
+bool modeSiagaCepat = false;
 
-// ==========================================
-// FUNGSI OUTPUT JSON
-// ==========================================
-
-void kirimEvent(const char* eventName, const char* message) {
+void kirimTelemetriJson(float suhu, float kelembapan, bool alertSuhu) {
   JsonDocument doc;
-
-  doc["event"] = eventName;
-  doc["msg"] = message;
-  doc["uptime_ms"] = millis();
-
-  serializeJson(doc, Serial);
-  Serial.println();
-  Serial.flush();
-}
-
-// ==========================================
-// FUNGSI TELEMETRI SENSOR
-// ==========================================
-
-void kirimTelemetriJson(
-  float suhu,
-  float kelembapan,
-  bool alertSuhu
-) {
-  JsonDocument doc;
-
-  doc["device_id"] = "THERMOSENSE-UNIB-11";
+  doc["device_id"] = "esp32-thermosense-kelompok11";
   doc["seq"] = ++nomorPaket;
   doc["uptime_ms"] = millis();
-
-  doc["mode"] = MODE_NON_BLOCKING
-                ? "non-blocking"
-                : "blocking";
-
-  doc["temp_c"] = suhu;
-  doc["hum_pct"] = kelembapan;
+  doc["mode"] = MODE_NON_BLOCKING ? "non-blocking" : "blocking";
+  doc["interval_ms"] = intervalTelemetri;
+  doc["temp_c"] = serialized(String(suhu, 2));
+  doc["hum_pct"] = serialized(String(kelembapan, 2));
   doc["alert"] = alertSuhu;
 
   serializeJson(doc, Serial);
   Serial.println();
-  Serial.flush();
 }
-
-// ==========================================
-// SETUP
-// ==========================================
 
 void setup() {
-
   Serial.begin(115200);
-
-  delay(500);
-
   pinMode(PIN_LED_ALERT, OUTPUT);
   pinMode(PIN_TOMBOL_DARURAT, INPUT_PULLUP);
-
-  digitalWrite(PIN_LED_ALERT, LOW);
-
   dht.begin();
-
-  kirimEvent(
-    "boot",
-    "THERMOSENSE Aktif"
-  );
-
-  kirimEvent(
-    "serial_test",
-    "Komunikasi Serial ESP32 Berhasil"
-  );
-
+  Serial.println("{\"event\":\"boot\",\"msg\":\"THERMOSENSE ESP32 Kelompok 11 Aktif\"}");
 }
 
-// ==========================================
-// LOOP
-// ==========================================
-
 void loop() {
-
-  // ----------------------------------------
-  // PEMERIKSAAN TOMBOL DARURAT
-  // ----------------------------------------
-
+  // 1. Pemeriksaan input tombol darurat secara kontinu
   bool statusTombol = digitalRead(PIN_TOMBOL_DARURAT);
+  if (statusTombol == LOW && statusTombolSebelumnya == HIGH) {
+    modeSiagaCepat = !modeSiagaCepat;
+    intervalTelemetri = modeSiagaCepat ? 500 : 2000; // Fitur C6: toggle 500ms siaga / 2000ms normal
 
-  if (statusTombol == LOW &&
-      statusTombolSebelumnya == HIGH) {
-
-    JsonDocument doc;
-
-    doc["event"] = "emergency_button";
-    doc["pressed_at_ms"] = millis();
-
-    serializeJson(doc, Serial);
-    Serial.println();
-
-    digitalWrite(
-      PIN_LED_ALERT,
-      !digitalRead(PIN_LED_ALERT)
-    );
-
-    delay(50);
+    Serial.printf("{\"event\":\"emergency_button\",\"pressed_at_ms\":%lu,\"mode_siaga\":%s,\"interval_ms\":%lu}\n",
+                  millis(), modeSiagaCepat ? "true" : "false", intervalTelemetri);
+    digitalWrite(PIN_LED_ALERT, !digitalRead(PIN_LED_ALERT));
+    delay(50); // Debounce singkat
   }
-
   statusTombolSebelumnya = statusTombol;
 
-  // ----------------------------------------
-  // MODE BLOCKING
-  // ----------------------------------------
-
+  // 2. Pembacaan sensor berkala: Mode Blocking vs Non-Blocking
 #if MODE_NON_BLOCKING == 0
-
-  delay(INTERVAL_TELEMETRI_MS);
-
-  kirimEvent(
-    "serial_test",
-    "Serial masih aktif"
-  );
-
+  delay(intervalTelemetri); // BLOCKING: CPU berhenti total selama interval!
   float h = dht.readHumidity();
   float t = dht.readTemperature();
-
-  if (isnan(h) || isnan(t)) {
-
-    kirimEvent(
-      "sensor_error",
-      "Gagal membaca DHT22"
-    );
-
-  } else {
-
+  if (!isnan(h) && !isnan(t)) {
     bool alert = (t >= AMBANG_SUHU_C);
-
-    digitalWrite(
-      PIN_LED_ALERT,
-      alert ? HIGH : LOW
-    );
-
+    digitalWrite(PIN_LED_ALERT, alert ? HIGH : LOW);
     kirimTelemetriJson(t, h, alert);
   }
-
 #else
-
-  // ----------------------------------------
-  // MODE NON-BLOCKING
-  // ----------------------------------------
-
   unsigned long sekarang = millis();
-
-  if (sekarang - waktuBacaTerakhir >=
-      INTERVAL_TELEMETRI_MS) {
-
+  if (sekarang - waktuBacaTerakhir >= intervalTelemetri) {
     waktuBacaTerakhir = sekarang;
-
-    // Tes komunikasi Serial
-    kirimEvent(
-      "serial_test",
-      "Serial masih aktif"
-    );
-
-    // Membaca sensor DHT22
     float h = dht.readHumidity();
     float t = dht.readTemperature();
-
-    // Pemeriksaan data sensor
-    if (isnan(h) || isnan(t)) {
-
-      kirimEvent(
-        "sensor_error",
-        "Gagal membaca DHT22"
-      );
-
-    } else {
-
+    if (!isnan(h) && !isnan(t)) {
       bool alert = (t >= AMBANG_SUHU_C);
-
-      // Pengaturan LED otomatis
-      digitalWrite(
-        PIN_LED_ALERT,
-        alert ? HIGH : LOW
-      );
-
-      // Mengirim data JSON
+      digitalWrite(PIN_LED_ALERT, alert ? HIGH : LOW);
       kirimTelemetriJson(t, h, alert);
     }
   }
-
 #endif
-
 }

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "author": "Tim PjBL Informatika UNIB - Lab 1, 2 & 3 (Kelompok 11)",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 50, "left": 0, "attrs": {} },
+    { "type": "board-ssd1306", "id": "oled1", "top": -150, "left": 60, "attrs": { "i2cAddress": "0x3c" } },
+    { "type": "wokwi-bmp280", "id": "bmp1", "top": -150, "left": -100, "attrs": { "i2cAddress": "0x76" } },
+    { "type": "wokwi-potentiometer", "id": "potSoil", "top": 70, "left": -220, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relayPump", "top": 190, "left": -240, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "rPump", "top": 320, "left": -90, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "ledPump", "top": 310, "left": -160, "attrs": { "color": "green" } },
+    { "type": "wokwi-dht22", "id": "dht1", "top": 70, "left": 190, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "rFan", "top": 195, "left": 140, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "ledFanPwm", "top": 185, "left": 210, "attrs": { "color": "blue" } },
+    { "type": "wokwi-pushbutton", "id": "btnMode", "top": 280, "left": 190, "attrs": { "color": "yellow" } }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+
+    [ "oled1:GND", "esp:GND.2", "black", [ "v-15", "h40", "v120" ] ],
+    [ "oled1:VCC", "esp:3V3", "red", [ "v-25", "h-110", "v130" ] ],
+    [ "oled1:SDA", "esp:D21", "green", [ "v-10", "h30", "v210" ] ],
+    [ "oled1:SCL", "esp:D22", "blue", [ "v-20", "h25", "v165" ] ],
+
+    [ "bmp1:GND", "esp:GND.1", "black", [ "v-15", "h-40", "v320" ] ],
+    [ "bmp1:VCC", "esp:3V3", "red", [ "v-25", "h100", "v130" ] ],
+    [ "bmp1:SDA", "esp:D21", "green", [ "v-35", "h240", "v210" ] ],
+    [ "bmp1:SCL", "esp:D22", "blue", [ "v-30", "h230", "v165" ] ],
+
+    [ "potSoil:VCC", "esp:3V3", "red", [ "v-20", "h110", "v40" ] ],
+    [ "potSoil:GND", "esp:GND.1", "black", [ "v30", "h110", "v120" ] ],
+    [ "potSoil:SIG", "esp:D34", "purple", [ "v0" ] ],
+
+    [ "relayPump:VCC", "esp:VIN", "red", [ "v40", "h140", "v60" ] ],
+    [ "relayPump:GND", "esp:GND.1", "black", [ "v30", "h140", "v30" ] ],
+    [ "relayPump:IN", "esp:D26", "green", [ "v0" ] ],
+
+    [ "esp:D26", "rPump:2", "green", [ "v30", "h-15" ] ],
+    [ "rPump:1", "ledPump:A", "green", [ "v0" ] ],
+    [ "ledPump:C", "esp:GND.1", "black", [ "v30", "h80" ] ],
+
+    [ "dht1:VCC", "esp:3V3", "red", [ "v-40", "h-220", "v60" ] ],
+    [ "dht1:GND", "esp:GND.2", "black", [ "v-15", "h-90" ] ],
+    [ "dht1:SDA", "esp:D4", "blue", [ "v30", "h-80" ] ],
+
+    [ "esp:D18", "rFan:1", "cyan", [ "v0" ] ],
+    [ "rFan:2", "ledFanPwm:A", "cyan", [ "v0" ] ],
+    [ "ledFanPwm:C", "esp:GND.2", "black", [ "v25", "h-110", "v-80" ] ],
+
+    [ "btnMode:1.l", "esp:D15", "gold", [ "v0" ] ],
+    [ "btnMode:2.l", "esp:GND.2", "black", [ "v30", "h-75", "v-160" ] ]
+  ]
+}

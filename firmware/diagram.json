@@ -1,37 +1,43 @@
 {
   "version": 1,
-  "author": "Tim PjBL Informatika UNIB - Lab 1 (Kelompok 11)",
+  "author": "Tim PjBL Informatika UNIB - Lab 1 & 2 (Kelompok 11)",
   "editor": "wokwi",
   "parts": [
     { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-dht22", "id": "dht1", "top": -50, "left": -150, "attrs": {} },
-    { "type": "wokwi-potentiometer", "id": "potSoil", "top": 90, "left": -150, "attrs": {} },
-    { "type": "wokwi-pushbutton", "id": "btnMode", "top": 190, "left": -150, "attrs": { "color": "yellow" } },
-    { "type": "wokwi-relay-module", "id": "relayPump", "top": -30, "left": 170, "attrs": {} },
-    { "type": "wokwi-led", "id": "ledPump", "top": 70, "left": 180, "attrs": { "color": "green" } },
-    { "type": "wokwi-resistor", "id": "rPump", "top": 115, "left": 170, "attrs": { "value": "220" } },
-    { "type": "wokwi-led", "id": "ledFanPwm", "top": 160, "left": 180, "attrs": { "color": "blue" } },
-    { "type": "wokwi-resistor", "id": "rFan", "top": 205, "left": 170, "attrs": { "value": "220" } }
+    { "type": "wokwi-dht22", "id": "dht1", "top": -70, "left": -190, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "potSoil", "top": 90, "left": -190, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btnMode", "top": 240, "left": -190, "attrs": { "color": "yellow" } },
+    { "type": "wokwi-relay-module", "id": "relayPump", "top": -60, "left": 180, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "rPump", "top": 85, "left": 160, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "ledPump", "top": 75, "left": 230, "attrs": { "color": "green" } },
+    { "type": "wokwi-resistor", "id": "rFan", "top": 175, "left": 160, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "ledFanPwm", "top": 165, "left": 230, "attrs": { "color": "blue" } }
   ],
   "connections": [
     [ "esp:TX0", "$serialMonitor:RX", "", [] ],
     [ "esp:RX0", "$serialMonitor:TX", "", [] ],
-    [ "dht1:VCC", "esp:3V3", "red", [] ],
-    [ "dht1:GND", "esp:GND.1", "black", [] ],
-    [ "dht1:SDA", "esp:D4", "blue", [] ],
-    [ "potSoil:VCC", "esp:3V3", "red", [] ],
-    [ "potSoil:GND", "esp:GND.1", "black", [] ],
-    [ "potSoil:SIG", "esp:D34", "purple", [] ],
-    [ "btnMode:1.l", "esp:D15", "gold", [] ],
-    [ "btnMode:2.l", "esp:GND.1", "black", [] ],
-    [ "relayPump:VCC", "esp:VIN", "red", [] ],
-    [ "relayPump:GND", "esp:GND.2", "black", [] ],
-    [ "relayPump:IN", "esp:D26", "green", [] ],
-    [ "esp:D26", "rPump:1", "green", [] ],
-    [ "rPump:2", "ledPump:A", "green", [] ],
-    [ "ledPump:C", "esp:GND.2", "black", [] ],
-    [ "esp:D18", "rFan:1", "cyan", [] ],
-    [ "rFan:2", "ledFanPwm:A", "cyan", [] ],
-    [ "ledFanPwm:C", "esp:GND.2", "black", [] ]
+
+    [ "dht1:VCC", "esp:3V3", "red", [ "v-20", "h120" ] ],
+    [ "dht1:GND", "esp:GND.1", "black", [ "v-15", "h-25", "v340", "h140" ] ],
+    [ "dht1:SDA", "esp:D4", "blue", [ "v-35", "h335", "v240" ] ],
+
+    [ "potSoil:VCC", "esp:3V3", "red", [ "v-20", "h110" ] ],
+    [ "potSoil:GND", "esp:GND.1", "black", [ "v30", "h110", "v120" ] ],
+    [ "potSoil:SIG", "esp:D34", "purple", [ "v0" ] ],
+
+    [ "btnMode:1.l", "esp:D15", "gold", [ "v45", "h315", "v-30" ] ],
+    [ "btnMode:2.l", "esp:GND.1", "black", [ "v25", "h110" ] ],
+
+    [ "relayPump:VCC", "esp:VIN", "red", [ "v-25", "h-250", "v360" ] ],
+    [ "relayPump:GND", "esp:GND.2", "black", [ "v15", "h-75" ] ],
+    [ "relayPump:IN", "esp:D26", "green", [ "v-35", "h-240", "v250" ] ],
+
+    [ "esp:D26", "rPump:1", "green", [ "v15", "h-15", "v115", "h160", "v-120" ] ],
+    [ "rPump:2", "ledPump:A", "green", [ "v0" ] ],
+    [ "ledPump:C", "esp:GND.2", "black", [ "v25", "h-140" ] ],
+
+    [ "esp:D18", "rFan:1", "cyan", [ "v0" ] ],
+    [ "rFan:2", "ledFanPwm:A", "cyan", [ "v0" ] ],
+    [ "ledFanPwm:C", "esp:GND.2", "black", [ "v25", "h-140", "v-120" ] ]
   ]
 }

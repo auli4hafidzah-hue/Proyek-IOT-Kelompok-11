@@ -5,7 +5,7 @@
 
 #define PIN_DHT 4
 #define TIPE_DHT DHT22
-#define PIN_LED_ALERT 2
+#define PIN_LED_ALERT 26 // GPIO 26 (LED Hijau pada diagram.json Wokwi)
 #define PIN_TOMBOL_DARURAT 15
 
 #define MODE_NON_BLOCKING 1

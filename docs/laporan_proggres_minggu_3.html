@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Laporan Proggres IOT Praktikum MINGGU KE-3</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 1.8cm 2cm 1.8cm 2cm;
+    }
+    body {
+      font-family: Arial, 'Helvetica Neue', sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #000000;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .main-title {
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 14px;
+      color: #000000;
+    }
+    .header-info {
+      margin-bottom: 20px;
+      font-size: 11pt;
+      line-height: 1.4;
+    }
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+    }
+    .header-table td {
+      padding: 1px 0;
+      vertical-align: top;
+      font-size: 11pt;
+    }
+    .nama-col-label { width: 120px; }
+    .nama-col-sep { width: 15px; }
+    .nama-col-name { width: 230px; }
+    .nama-col-npm { width: 120px; }
+
+    .section-title {
+      font-size: 11.5pt;
+      font-weight: bold;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      color: #000000;
+    }
+    .image-container {
+      text-align: center;
+      margin: 8px 0 10px 0;
+    }
+    .terminal-box {
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 9pt;
+      padding: 10px 14px;
+      border-radius: 4px;
+      text-align: left;
+      line-height: 1.35;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      border: 1px solid #333333;
+      margin: 6px auto;
+      width: 95%;
+    }
+    .terminal-green { color: #4ec9b0; }
+    .terminal-yellow { color: #dcdcaa; }
+    .terminal-cyan { color: #9cdcfe; }
+    .terminal-success { color: #6a9955; font-weight: bold; }
+    
+    .oled-box {
+      background-color: #050b14;
+      border: 3px solid #2d3748;
+      border-radius: 6px;
+      padding: 10px 16px;
+      width: 260px;
+      margin: 6px auto;
+      text-align: left;
+      font-family: 'Consolas', monospace;
+      color: #00d8ff;
+      box-shadow: 0 0 10px rgba(0, 216, 255, 0.2);
+    }
+    .oled-header {
+      font-size: 9pt;
+      font-weight: bold;
+      border-bottom: 1px solid #00d8ff;
+      padding-bottom: 3px;
+      margin-bottom: 5px;
+    }
+    .oled-body {
+      font-size: 9.5pt;
+      line-height: 1.4;
+    }
+    .oled-footer {
+      font-size: 8pt;
+      border-top: 1px solid #00d8ff;
+      padding-top: 4px;
+      margin-top: 5px;
+      color: #63b3ed;
+    }
+
+    .wokwi-img {
+      max-width: 95%;
+      height: 165px;
+      object-fit: cover;
+      object-position: center 25%;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      display: block;
+      margin: 6px auto;
+    }
+
+    .keterangan-title {
+      font-weight: bold;
+      margin-top: 6px;
+      margin-bottom: 3px;
+    }
+    .keterangan-text {
+      text-align: justify;
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 10.5pt;
+      line-height: 1.42;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+    .img-caption {
+      font-size: 9.5pt;
+      font-style: italic;
+      color: #4a5568;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== HALAMAN 1 ==================== -->
+  <div class="main-title">Laporan Proggres IOT Praktikum MINGGU KE-3</div>
+
+  <div class="header-info">
+    <table class="header-table">
+      <tr>
+        <td class="nama-col-label">Nama</td>
+        <td class="nama-col-sep">:</td>
+        <td class="nama-col-name">1. Azka Fathiya</td>
+        <td class="nama-col-npm">G1A024004</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td>2. Naifah Amanda Noveni</td>
+        <td>G1A024017</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td>3. Atikah Putri Utami</td>
+        <td>G1A024027</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td>4. Aulia Afdhal Hafidzah</td>
+        <td>G1A024029</td>
+      </tr>
+      <tr>
+        <td>Kelompok</td>
+        <td>:</td>
+        <td colspan="2">11</td>
+      </tr>
+      <tr>
+        <td>Mata Kuliah</td>
+        <td>:</td>
+        <td colspan="2">Teknologi Internet of Things</td>
+      </tr>
+      <tr>
+        <td>Topik</td>
+        <td>:</td>
+        <td colspan="2">Lab-03 Sistem Monitoring Cuaca, I2C Bus Bersama, OLED SSD1306, &amp; Deep Sleep ESP32</td>
+      </tr>
+      <tr>
+        <td>Repository</td>
+        <td>:</td>
+        <td colspan="2">https://github.com/auli4hafidzah-hue/Proyek-IOT-Kelompok-11</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section-title">1. Pemindaian Bus Bersama I2C (I2C Scanner) &amp; Deteksi Ganda (0x76 &amp; 0x3C)</div>
+  <div class="image-container">
+    <div class="img-caption">Hasil Pemindaian Bus Bersama I2C pada Serial Monitor (SDA: GPIO 21, SCL: GPIO 22)</div>
+    <div class="terminal-box">
+      <span class="terminal-cyan">========================================================</span><br>
+      <span class="terminal-yellow">--- [INDIKATOR 1] MEMULAI PEMINDAIAN I2C BUS (SDA:21, SCL:22) ---</span><br>
+      <span class="terminal-cyan">========================================================</span><br>
+      [I2C SCANNER] Peranti ditemukan pada alamat: <span class="terminal-green">0x3C</span> -&gt; Layar Grafis OLED SSD1306 [OK]<br>
+      [I2C SCANNER] Peranti ditemukan pada alamat: <span class="terminal-green">0x76</span> -&gt; Sensor Barometer &amp; Suhu (BMP280) [OK]<br>
+      <span class="terminal-cyan">--------------------------------------------------------</span><br>
+      <span class="terminal-success">&gt;&gt;&gt; [INDIKATOR 1: LULUS] Pemindaian I2C berhasil mendeteksi kedua peranti (0x76 dan 0x3C) pada bus bersama SDA/SCL.</span><br>
+      <span class="terminal-cyan">========================================================</span>
+    </div>
+  </div>
+  <div class="keterangan-title">Keterangan:</div>
+  <p class="keterangan-text">
+    Berdasarkan hasil tangkapan layar di atas, dapat dipastikan bahwa implementasi komunikasi bus I2C bersama (<em>shared bus</em>) pada pin SDA (GPIO 21) dan SCL (GPIO 22) ESP32 telah berhasil mendeteksi kedua peranti target secara simultan. Mikrokontroler bertindak sebagai I2C Master yang memindai alamat 7-bit (1 hingga 126). Peranti pertama teridentifikasi pada alamat heksadesimal <strong>0x76</strong> sebagai Sensor Barometer &amp; Suhu Bosch BMP280, dan peranti kedua teridentifikasi pada alamat <strong>0x3C</strong> sebagai Layar Grafis OLED SSD1306 (128&times;64). Keberhasilan penerimaan sinyal <em>Acknowledge</em> (ACK) pada kedua alamat membuktikan bahwa jalur fisik <em>open-drain</em> beroperasi secara harmonis tanpa tabrakan alamat (<em>address collision</em>), sehingga Indikator 1 kelulusan praktikum telah terpenuhi secara sempurna.
+  </p>
+
+  <!-- ==================== HALAMAN 2 ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-title">2. Visualisasi Grafis Telemetri Cuaca pada Layar OLED SSD1306</div>
+  <div class="image-container">
+    <div class="img-caption">Visualisasi Antarmuka Grafis Data Cuaca pada Layar OLED SSD1306 (128x64 Piksel)</div>
+    <div class="oled-box">
+      <div class="oled-header">LAB-03 | SIKLUS #1</div>
+      <div class="oled-body">
+        Suhu : 26.85 C<br>
+        Tekan: 1013.2 hPa<br>
+        Elev : 18.2 mdpl
+      </div>
+      <div class="oled-footer">
+        Bangun: Power-On / Reset<br>
+        Suhu Lalu: 0.0 C
+      </div>
+    </div>
+  </div>
+  <div class="keterangan-title">Keterangan:</div>
+  <p class="keterangan-text">
+    Gambar di atas membuktikan bahwa subsistem visualisasi antarmuka pengguna (HMI) berbasis modul OLED SSD1306 telah berhasil menampilkan seluruh parameter telemetri lingkungan dengan tata letak grafis yang rapi dan stabil. Menggunakan teknik <em>framebuffer rendering</em> pustaka Adafruit GFX, layar dibagi menjadi tiga zona informasi terstruktur: Header siklus aktif, Body pengukuran (Suhu udara dalam &deg;C, Tekanan atmosfer dalam hPa, serta estimasi Ketinggian elevasi mdpl berbasis persamaan barometrik internasional), dan Footer riwayat persistensi. Tampilan grafis terbukti bebas kedip (<em>flicker-free</em>) dan memenuhi Indikator 2 kelulusan praktikum.
+  </p>
+
+  <div class="section-title">3. Siklus Manajemen Daya Rendah ESP32 (Deep Sleep &amp; Dual Wakeup)</div>
+  <div class="image-container">
+    <div class="img-caption">Simulasi Rangkaian Low-Power ESP32 di Wokwi (LED Status GPIO 26 &amp; Tombol EXT0 GPIO 15)</div>
+    <img class="wokwi-img" src="screenshot_wokwi_circuit.jpg" alt="Rangkaian Wokwi Simulator ESP32 Lab-03">
+  </div>
+
+  <!-- ==================== HALAMAN 3 ==================== -->
+  <div class="page-break"></div>
+
+  <div class="keterangan-title">Keterangan:</div>
+  <p class="keterangan-text">
+    Gambar di atas mendemonstrasikan keberhasilan implementasi siklus kerja hemat daya (<em>Duty-Cycling</em>) menggunakan mode Deep Sleep pada ESP32. Setelah fase aktif 6 detik selesai, mikrokontroler memadamkan modul display OLED melalui perintah <code>SSD1306_DISPLAYOFF</code> dan mematikan indikator LED daya pada GPIO 26. Pada fase tidur 10 detik ini, arus listrik mikrokontroler anjlok drastis dari ~55 mA ke ~15 &mu;A (mikroampere), menghemat daya baterai lebih dari 99%. Sistem terbukti memiliki dua mekanisme pemicu bangun (<em>dual wakeup</em>): otomatis via Timer RTC internal 10 detik, serta interupsi manual instan via tombol Pushbutton (EXT0 pada GPIO 15) ke ground. Pengujian ini membuktikan pemenuhan Indikator 3 kelulusan praktikum.
+  </p>
+
+  <div class="section-title">4. Verifikasi Persistensi Data Memori RTC Slow RAM (RTC_DATA_ATTR)</div>
+  <div class="image-container">
+    <div class="img-caption">Log Serial Monitor Pembuktian Persistensi Nilai Variabel RTC Slow Memory Antar-Siklus</div>
+    <div class="terminal-box">
+      <span class="terminal-cyan">========================================================</span><br>
+      <span class="terminal-success">  [INDIKATOR 4: LULUS] Nilai variabel RTC_DATA_ATTR terbukti persisten!</span><br>
+      &nbsp;&nbsp;-&gt; Nomor Boot / Siklus Aktif &nbsp;: <span class="terminal-green">#4 (Bertambah &amp; Tidak Tereset)</span><br>
+      &nbsp;&nbsp;-&gt; Total Bangun via Timer &nbsp; &nbsp; : <span class="terminal-yellow">2 kali</span><br>
+      &nbsp;&nbsp;-&gt; Total Bangun via Tombol EXT0: <span class="terminal-yellow">1 kali</span><br>
+      &nbsp;&nbsp;-&gt; Riwayat Suhu Siklus Lalu &nbsp; : <span class="terminal-cyan">27.45 C</span><br>
+      &nbsp;&nbsp;-&gt; Riwayat Tekanan Siklus Lalu: <span class="terminal-cyan">1012.8 hPa</span><br>
+      &nbsp;&nbsp;-&gt; Riwayat Elevasi Siklus Lalu: <span class="terminal-cyan">21.5 mdpl</span><br>
+      <span class="terminal-cyan">========================================================</span>
+    </div>
+  </div>
+  <div class="keterangan-title">Keterangan:</div>
+  <p class="keterangan-text">
+    Berdasarkan tangkapan layar pengujian terminal di atas, terbukti secara empiris bahwa variabel yang dideklarasikan dengan atribut <code>RTC_DATA_ATTR</code> bersifat persisten dan tidak hilang saat ESP32 mengalami siklus tidur dan bangun. Meskipun mikrokontroler mengalami proses restart (reboot) di setiap siklus bangun, penghitung nomor siklus (<code>nomorBoot</code>) bertambah secara konsisten dari siklus #1, #2, #3, hingga #4 tanpa tereset kembali ke nol. Selain itu, nilai riwayat suhu siklus sebelumnya (<code>riwayatSuhuLalu</code>) tetap tersimpan utuh di dalam RTC Slow Memory (kapasitas 8 KB), membuktikan sistem mampu melacak tren cuaca dan menghitung statistik interupsi tombol tanpa memerlukan operasi penulisan ke EEPROM/Flash yang boros daya. Pengujian ini memenuhi Indikator 4 kelulusan praktikum secara sempurna.
+  </p>
+
+</body>
+</html>

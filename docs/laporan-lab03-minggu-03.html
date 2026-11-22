@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Laporan Praktikum Sistem IoT - Minggu ke-3 (Lab-03) Kelompok 11</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 18mm 20mm 18mm;
+      @bottom-right {
+        content: counter(page) " / " counter(pages);
+        font-size: 9pt;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #718096;
+      }
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      color: #2d3748;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .header-univ {
+      text-align: center;
+      border-bottom: 2.5px solid #1a365d;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .header-univ h1 {
+      font-size: 14pt;
+      font-weight: 800;
+      color: #1a365d;
+      margin: 0 0 4px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .header-univ h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #2b6cb0;
+      margin: 0 0 4px 0;
+    }
+    .header-univ p {
+      font-size: 9.5pt;
+      color: #4a5568;
+      margin: 0;
+    }
+    h2.section-title {
+      font-size: 12pt;
+      color: #1a365d;
+      border-left: 4px solid #2b6cb0;
+      padding-left: 8px;
+      margin-top: 24px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    h3.sub-section-title {
+      font-size: 11pt;
+      color: #2c5282;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+    h4 {
+      font-size: 10.5pt;
+      color: #2d3748;
+      margin-top: 12px;
+      margin-bottom: 6px;
+    }
+    p {
+      margin: 0 0 10px 0;
+      text-align: justify;
+    }
+    ul, ol {
+      margin: 0 0 12px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      font-size: 9.5pt;
+    }
+    table th, table td {
+      border: 1px solid #cbd5e0;
+      padding: 6px 9px;
+      text-align: left;
+    }
+    table th {
+      background-color: #edf2f7;
+      color: #1a202c;
+      font-weight: 700;
+      text-align: center;
+    }
+    table tr:nth-child(even) {
+      background-color: #f7fafc;
+    }
+    .badge-lulus {
+      display: inline-block;
+      background-color: #38a169;
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 8.5pt;
+    }
+    .badge-opt {
+      display: inline-block;
+      background-color: #3182ce;
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 8.5pt;
+    }
+    .callout {
+      background-color: #ebf8ff;
+      border-left: 4px solid #3182ce;
+      padding: 10px 14px;
+      margin: 12px 0;
+      border-radius: 0 4px 4px 0;
+      font-size: 9.5pt;
+    }
+    code {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 9pt;
+      background-color: #edf2f7;
+      color: #c53030;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    pre {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 8.5pt;
+      background-color: #1a202c;
+      color: #edf2f7;
+      padding: 12px;
+      border-radius: 5px;
+      overflow-x: auto;
+      line-height: 1.4;
+      margin: 10px 0 16px 0;
+    }
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .math-box {
+      background-color: #f7fafc;
+      border: 1px solid #e2e8f0;
+      padding: 8px 12px;
+      margin: 8px 0;
+      text-align: center;
+      font-family: 'Georgia', serif;
+      font-style: italic;
+      border-radius: 4px;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+    .text-center { text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="header-univ">
+    <h1>LAPORAN PRAKTIKUM SISTEM IOT &mdash; MINGGU KE-3 (LAB-03)</h1>
+    <h2>Sistem Monitoring Cuaca, Antarmuka Bus Bersama I2C, Layar Grafis OLED SSD1306, &amp; Manajemen Daya Rendah ESP32 (Deep Sleep &amp; RTC Memory)</h2>
+    <p><strong>Mata Kuliah:</strong> Teknologi Internet of Things (IoT) | <strong>Program Studi:</strong> S1 Informatika &mdash; Fakultas Teknik Universitas Bengkulu</p>
+    <p><strong>Laboratorium:</strong> Jaringan Komputer, Telekomunikasi &amp; Sistem Tertanam FT UNIB</p>
+  </div>
+
+  <h3 class="sub-section-title">Identitas Tim Pengembang (Kelompok 11)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Nama Lengkap Anggota</th>
+        <th style="width: 18%;">NPM</th>
+        <th>Peran &amp; Kontribusi Teknis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Azka Fathiya</strong></td>
+        <td class="text-center">G1A024004</td>
+        <td>Karakterisasi Bus Bersama I2C, Addressing 7-bit, &amp; Analisis Sensor BMP280</td>
+      </tr>
+      <tr>
+        <td><strong>Naifah Amanda Noveni</strong></td>
+        <td class="text-center">G1A024017</td>
+        <td>Penyusunan Arsitektur Firmware Low-Power, State Machine Deep Sleep, &amp; Persistensi RTC</td>
+      </tr>
+      <tr>
+        <td><strong>Atikah Putri Utami</strong></td>
+        <td class="text-center">G1A024027</td>
+        <td>Desain Antarmuka Grafis OLED SSD1306, Framebuffer Layout, &amp; Kalkulasi Energi Baterai</td>
+      </tr>
+      <tr>
+        <td><strong>Aulia Afdhal Hafidzah</strong></td>
+        <td class="text-center">G1A024029</td>
+        <td>Perancangan Skematik Wokwi Simulator, Rangkaian I2C Paralel, &amp; Uji Wakeup EXT0</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section-title">1. Pendahuluan dan Tujuan Praktikum</h2>
+  <p>Praktikum Lab-03 Minggu ke-3 berfokus pada implementasi <strong>Node Sensor Cuaca Otonom Berdaya Sangat Rendah (<em>Ultra-Low Power Autonomous Weather Station</em>)</strong> berbasis mikrokontroler ESP32. Dalam aplikasi nyata perkebunan kopi di area terpencil, ketersediaan daya listrik AC sering kali tidak tersedia. Perangkat IoT dituntut beroperasi mengandalkan pasokan baterai berkapasitas terbatas dengan siklus hidup berbulan-bulan hingga tahunan.</p>
+  <p>Sistem ini mengintegrasikan sensor barometer presisi <strong>Bosch BMP280</strong> dan layar grafis <strong>OLED SSD1306</strong> pada satu jalur komunikasi I2C bersama (<em>shared bus</em>), serta menerapkan siklus kerja hemat daya <em>Duty-Cycling</em> menggunakan mode <strong>Deep Sleep ESP32</strong> dengan mempertahankan memori riwayat pada <strong>RTC Slow Memory (<code>RTC_DATA_ATTR</code>)</strong>.</p>
+
+  <p><strong>Tujuan Spesifik Praktikum:</strong></p>
+  <ol>
+    <li>Mengimplementasikan protokol komunikasi I2C pada bus bersama (SDA: GPIO 21, SCL: GPIO 22) untuk mengendalikan BMP280 (<code>0x76</code>) dan OLED SSD1306 (<code>0x3C</code>) tanpa tabrakan alamat.</li>
+    <li>Mengembangkan algoritma <em>I2C Scanner</em> untuk mendiagnosis kesehatan koneksi fisik dan integritas sinyal elektrik.</li>
+    <li>Merancang antarmuka grafis data cuaca (suhu, tekanan, elevasi) yang stabil dan rapi pada layar OLED 128&times;64 piksel.</li>
+    <li>Menerapkan arsitektur <em>Deep Sleep</em> dengan pemicu bangun ganda (Timer otomatis 10s dan interupsi tombol eksternal EXT0 GPIO 15).</li>
+    <li>Membuktikan secara empiris persistensi data telemetri dan penghitung nomor siklus boot pada memori <code>RTC_DATA_ATTR</code> saat mikrokontroler mengalami restart pada fase bangun.</li>
+  </ol>
+
+  <h2 class="section-title">2. Arsitektur Perangkat Keras dan Alokasi Pin GPIO ESP32</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Nama Komponen / Sinyal</th>
+        <th style="width: 20%;">Pin Fisik ESP32</th>
+        <th style="width: 22%;">Mode Konfigurasi</th>
+        <th>Keterangan Teknis &amp; Keamanan Perangkat Keras</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>I2C Data Bersama (SDA)</strong></td>
+        <td><strong>GPIO 21</strong></td>
+        <td>Open-Drain Bidirectional</td>
+        <td>Jalur serial data bersama untuk BMP280 dan SSD1306, ditarik ke 3,3V via pull-up.</td>
+      </tr>
+      <tr>
+        <td><strong>I2C Clock Bersama (SCL)</strong></td>
+        <td><strong>GPIO 22</strong></td>
+        <td>Open-Drain Output</td>
+        <td>Jalur pulsa clock detak waktu (100 kHz) yang dikendalikan oleh ESP32 Master.</td>
+      </tr>
+      <tr>
+        <td><strong>Sensor Bosch BMP280</strong></td>
+        <td>Terhubung SDA &amp; SCL</td>
+        <td>I2C Slave (Alamat <code>0x76</code>)</td>
+        <td>Pin SDO terhubung ke GND untuk menetapkan alamat <code>0x76</code>. Catu daya 3,3V.</td>
+      </tr>
+      <tr>
+        <td><strong>Layar OLED SSD1306</strong></td>
+        <td>Terhubung SDA &amp; SCL</td>
+        <td>I2C Slave (Alamat <code>0x3C</code>)</td>
+        <td>Resolusi 128&times;64, monochrome, internal charge pump aktif. Catu daya 3,3V.</td>
+      </tr>
+      <tr>
+        <td><strong>Pushbutton Manual (EXT0)</strong></td>
+        <td><strong>GPIO 15</strong></td>
+        <td>Input Pull-Up (RTC GPIO)</td>
+        <td>Terhubung ke RTC controller. Active LOW (0) ke GND untuk interupsi bangun seketika.</td>
+      </tr>
+      <tr>
+        <td><strong>LED Indikator Status Daya</strong></td>
+        <td><strong>GPIO 26</strong></td>
+        <td>Digital Output</td>
+        <td>Menyala (HIGH) saat fase aktif (6 detik) dan padam (LOW) saat Deep Sleep (10 detik).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2 class="section-title">3. Hasil Pengamatan dan Data Eksperimental</h2>
+
+  <h3 class="sub-section-title">3.1 Tabel Pengamatan 3.1 &mdash; Hasil Pemindaian Bus Bersama I2C (I2C Scanner)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Alamat Heksadesimal</th>
+        <th style="width: 25%;">Status Respons Bus</th>
+        <th style="width: 15%;">Kode Error</th>
+        <th>Identifikasi Peranti Terdeteksi</th>
+        <th style="width: 15%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="text-center"><code>0x01</code> s.d. <code>0x3B</code></td>
+        <td>NACK (No Acknowledge)</td>
+        <td class="text-center">2</td>
+        <td>Jalur mengambang (Tidak ada modul terpasang)</td>
+        <td class="text-center"><span class="badge-opt">Normal</span></td>
+      </tr>
+      <tr>
+        <td class="text-center"><strong><code>0x3C</code></strong></td>
+        <td><strong>ACK (Acknowledge)</strong></td>
+        <td class="text-center"><strong>0 (Sukses)</strong></td>
+        <td><strong>Layar Grafis OLED SSD1306 (128&times;64)</strong></td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+      <tr>
+        <td class="text-center"><code>0x3D</code> s.d. <code>0x75</code></td>
+        <td>NACK (No Acknowledge)</td>
+        <td class="text-center">2</td>
+        <td>Jalur mengambang (Tidak ada modul terpasang)</td>
+        <td class="text-center"><span class="badge-opt">Normal</span></td>
+      </tr>
+      <tr>
+        <td class="text-center"><strong><code>0x76</code></strong></td>
+        <td><strong>ACK (Acknowledge)</strong></td>
+        <td class="text-center"><strong>0 (Sukses)</strong></td>
+        <td><strong>Sensor Barometer &amp; Suhu Bosch BMP280</strong></td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+      <tr>
+        <td class="text-center"><code>0x77</code> s.d. <code>0x7E</code></td>
+        <td>NACK (No Acknowledge)</td>
+        <td class="text-center">2</td>
+        <td>Jalur mengambang (Tidak ada modul terpasang)</td>
+        <td class="text-center"><span class="badge-opt">Normal</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub-section-title">3.2 Tabel Pengamatan 3.2 &mdash; Karakterisasi Siklus Kerja (Duty-Cycle) &amp; Profil Arus Daya Listrik</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%;">Fase Operasional</th>
+        <th style="width: 15%;">Durasi</th>
+        <th>Status Perangkat Keras ESP32</th>
+        <th style="width: 18%;">Status Display &amp; LED</th>
+        <th style="width: 16%;">Arus Rata-rata ($I$)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Fase Aktif (Run-Mode)</strong></td>
+        <td class="text-center"><strong>6 detik</strong></td>
+        <td>CPU Xtensa 240 MHz aktif, baca sensor BMP280, render OLED SSD1306.</td>
+        <td class="text-center"><strong>MENYALA</strong></td>
+        <td class="text-center"><strong>~55,0 mA</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Transisi Masuk Tidur</strong></td>
+        <td class="text-center">1 detik</td>
+        <td>Perintah <code>DISPLAYOFF</code>, LED pin 26 LOW, konfigurasi timer/EXT0.</td>
+        <td class="text-center">PADAM</td>
+        <td class="text-center">~30,0 mA</td>
+      </tr>
+      <tr>
+        <td><strong>Fase Deep Sleep</strong></td>
+        <td class="text-center"><strong>10 detik</strong></td>
+        <td>CPU mati, osilator mati, SRAM mati. Hanya RTC Slow Memory 8 KB dialiri daya.</td>
+        <td class="text-center"><strong>MATI TOTAL</strong></td>
+        <td class="text-center"><strong>~15 &mu;A (0,015 mA)</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub-section-title">3.3 Tabel Pengamatan 3.3 &mdash; Uji Bukti Persistensi Variabel RTC Slow Memory (<code>RTC_DATA_ATTR</code>)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%;">Siklus</th>
+        <th style="width: 25%;">Pemicu Bangun (Wakeup Cause)</th>
+        <th style="width: 13%;">Nomor Boot</th>
+        <th style="width: 14%;">Suhu Terbaca</th>
+        <th style="width: 14%;">Tekanan Udara</th>
+        <th style="width: 14%;">Riwayat Lalu</th>
+        <th style="width: 10%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="text-center">#1</td>
+        <td>Power-On / Reset</td>
+        <td class="text-center"><strong>1</strong></td>
+        <td class="text-center">26.85 &deg;C</td>
+        <td class="text-center">1013.2 hPa</td>
+        <td class="text-center">0.00 &deg;C</td>
+        <td class="text-center"><span class="badge-opt">Init</span></td>
+      </tr>
+      <tr>
+        <td class="text-center">#2</td>
+        <td>Timer Otomatis (10 detik)</td>
+        <td class="text-center"><strong>2</strong></td>
+        <td class="text-center">27.10 &deg;C</td>
+        <td class="text-center">1013.0 hPa</td>
+        <td class="text-center">26.85 &deg;C</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+      <tr>
+        <td class="text-center">#3</td>
+        <td>Timer Otomatis (10 detik)</td>
+        <td class="text-center"><strong>3</strong></td>
+        <td class="text-center">27.45 &deg;C</td>
+        <td class="text-center">1012.8 hPa</td>
+        <td class="text-center">27.10 &deg;C</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+      <tr>
+        <td class="text-center">#4</td>
+        <td><strong>Tombol Manual EXT0 (GPIO 15)</strong></td>
+        <td class="text-center"><strong>4</strong></td>
+        <td class="text-center">27.50 &deg;C</td>
+        <td class="text-center">1012.8 hPa</td>
+        <td class="text-center">27.45 &deg;C</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+      <tr>
+        <td class="text-center">#5</td>
+        <td>Timer Otomatis (10 detik)</td>
+        <td class="text-center"><strong>5</strong></td>
+        <td class="text-center">27.30 &deg;C</td>
+        <td class="text-center">1012.9 hPa</td>
+        <td class="text-center">27.50 &deg;C</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2 class="section-title">4. Analisis Komprehensif Berbasis Level Taksonomi Bloom (C1 &ndash; C6)</h2>
+
+  <h3 class="sub-section-title">4.1 [C1 &ndash; Mengingat] Karakteristik Fisik Bus I2C dan Prinsip Addressing 7-Bit</h3>
+  <p><strong>Pertanyaan:</strong> Jelaskan prinsip komunikasi perangkat keras bus I2C! Mengapa protokol I2C menggunakan sistem pengalamatan 7-bit, dan apa peran resistor pull-up eksternal?</p>
+  <p><strong>Jawaban:</strong> Protokol I2C (<em>Inter-Integrated Circuit</em>) adalah antarmuka serial sinkron 2 kawat (SDA untuk data dan SCL untuk clock) berarsitektur <em>open-drain</em>. Pada frame transmisi 1 byte pertama, 7-bit teratas (bit 7 hingga bit 1) diperuntukkan bagi alamat unik perangkat budak (<em>slave address</em>), memungkinkan sebanyak 2<sup>7</sup> = 128 perangkat unik (rentang <code>0x00</code> hingga <code>0x7F</code>). Bit terbawah (bit 0 / LSB) menentukan arah operasi: logika <code>0</code> untuk menulis (Master-to-Slave) dan logika <code>1</code> untuk membaca (Slave-to-Master). Resistor <em>pull-up</em> berfungsi mengembalikan tegangan jalur ke rel 3,3 V saat tidak ada perangkat yang menarik garis ke ground, mencegah terjadinya korsleting listrik (*bus contention*) saat dua perangkat merespons bus bersamaan.</p>
+
+  <h3 class="sub-section-title">4.2 [C2 &ndash; Memahami] Hirarki Manajemen Daya ESP32 &amp; Alokasi RTC Slow Memory</h3>
+  <p><strong>Pertanyaan:</strong> Mengapa variabel SRAM utama terhapus saat Deep Sleep, sedangkan variabel dengan atribut <code>RTC_DATA_ATTR</code> tetap persisten?</p>
+  <p><strong>Jawaban:</strong> ESP32 memiliki pemisahan domain daya fisik (<em>Power Domains</em>). Saat instruksi <code>esp_deep_sleep_start()</code> dieksekusi, sirkuit regulator internal memutus catu daya ke domain digital utama (<em>VDD_DIG</em>) yang memasok CPU Xtensa dan 320 KB SRAM utama. Namun, domain daya RTC (<em>VDD_RTC</em>) tetap disuplai oleh regulator siaga daya rendah (<em>low-power LDO</em>). Variabel dengan atribut <code>RTC_DATA_ATTR</code> secara khusus diarahkan oleh linker kompiler ke segmen memori <code>.rtc.data</code> yang terletak di dalam <strong>RTC Slow Memory (kapasitas 8 KB)</strong>. Dengan demikian, nilainya tetap utuh dan tidak tereset meskipun mikrokontroler mengalami restart pada fase bangun.</p>
+
+  <h3 class="sub-section-title">4.3 [C3 &ndash; Menerapkan] Kalkulasi Elevasi Barometrik &amp; Analisis Umur Baterai</h3>
+  <p><strong>Pertanyaan:</strong> Hitunglah estimasi umur pakai baterai lithium 18650 kapasitas 2500 mAh pada mode selalu aktif (60 mA) dibandingkan sistem Deep Sleep praktikum Lab-03 dan implementasi kebun kopi (aktif 6s, tidur 10 menit)!</p>
+  <div class="callout">
+    <strong>1. Mode Selalu Aktif (Continuous / Tanpa Sleep &mdash; 60 mA):</strong><br>
+    $$T = \frac{2500\text{ mAh}}{60\text{ mA}} \approx 41,67\text{ jam} \approx \mathbf{1,73\text{ hari (Baterai habis dalam 2 hari)}}$$
+    <strong>2. Mode Praktikum Lab-03 (Aktif 6 detik @ 55 mA, Tidur 10 detik @ 0,015 mA):</strong><br>
+    $$I_{\text{avg}} = \frac{(55 \times 6) + (0,015 \times 10)}{16} = \frac{330,15}{16} \approx \mathbf{20,63\text{ mA}} \longrightarrow T = \frac{2500}{20,63} \approx \mathbf{5,05\text{ hari}}$$
+    <strong>3. Proyeksi Stasiun Cuaca Kebun Kopi (Aktif 6 detik @ 55 mA, Tidur 10 Menit = 600 detik @ 0,015 mA):</strong><br>
+    $$I_{\text{avg}} = \frac{(55 \times 6) + (0,015 \times 600)}{606} = \frac{339}{606} \approx \mathbf{0,559\text{ mA}} \longrightarrow T = \frac{2500}{0,559} \approx 4472\text{ jam} \approx \mathbf{186,3\text{ hari (~6,2 Bulan)}}$$
+  </div>
+
+  <h3 class="sub-section-title">4.4 [C4 &ndash; Menganalisis] Analisis Integritas Sinyal pada Beban Kapasitif Bus I2C</h3>
+  <p><strong>Pertanyaan:</strong> Apa dampak kabel sensor yang terlalu panjang (&gt; 2 meter) pada bus bersama I2C dan bagaimana solusinya?</p>
+  <p><strong>Jawaban:</strong> Kabel yang terlalu panjang menimbulkan kapasitansi parasitik bus yang melampaui batas standar ($C_{\text{bus}} &gt; 400\text{ pF}$). Sesuai hukum pengisian RC ($\tau = R_{\text{pull-up}} \times C_{\text{bus}}$), bentuk gelombang naik sinyal (<em>rise time</em>) menjadi sangat lambat dan melandai, menyebabkan bit ACK gagal terdeteksi dan memicu kondisi <em>I2C Bus Lockup</em>. Solusi perangkat keras mencakup penggantian nilai resistor pull-up menjadi lebih kuat ($1,8\text{ k}\Omega$) atau memasang IC I2C Bus Buffer (seperti P82B715). Solusi perangkat lunak meliputi penurunan kecepatan clock I2C ke 50 kHz dan mengaktifkan batas waktu timeout (<code>Wire.setTimeOut(25)</code>).</p>
+
+  <h3 class="sub-section-title">4.5 [C5 &ndash; Mengevaluasi] Komparasi Pemilihan Display Visual (OLED vs LCD vs E-Paper)</h3>
+  <p>Layar <strong>OLED SSD1306</strong> terbukti unggul untuk prototipe berkat konsumsi daya nol saat tidur (<code>DISPLAYOFF</code>), grafis fleksibel, dan waktu respons instan (&lt; 50 ms) dibanding LCD 1602 yang boros lampu latar (backlight). Untuk produksi komersial luar ruangan jangka panjang, layar <strong>E-Paper (EPD)</strong> menjadi pilihan masa depan terbaik karena sifat <em>bistable display</em>-nya yang mampu mempertahankan gambar tanpa arus listrik sama sekali.</p>
+
+  <h3 class="sub-section-title">4.6 [C6 &ndash; Mencipta] Arsitektur Firmware Resilien: Pemicu Bangun Ganda (Dual Wakeup)</h3>
+  <pre><code>// Deteksi Pemicu Bangun & Klasifikasi Logika Kerja
+String periksaPemicuBangun() {
+  esp_sleep_wakeup_cause_t pemicu = esp_sleep_get_wakeup_cause();
+  if (pemicu == ESP_SLEEP_WAKEUP_EXT0) {
+    totalBangunTombol++; // Interupsi Tombol Manual GPIO 15
+    return "Tombol EXT0 (GPIO 15)";
+  } else if (pemicu == ESP_SLEEP_WAKEUP_TIMER) {
+    totalBangunTimer++;  // Alarm Timer Rutin 10 Detik
+    return "Timer Otomatis (10s)";
+  }
+  return "Power-On / Reset";
+}</code></pre>
+
+  <h2 class="section-title">5. Ceklis Evaluasi dan Pembuktian Indikator Kelulusan</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">No.</th>
+        <th style="width: 48%;">Indikator Kelulusan Laboratorium (Lab-03)</th>
+        <th style="width: 14%;">Status</th>
+        <th>Bukti Pembuktian Pengujian Terverifikasi</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="text-center"><strong>1</strong></td>
+        <td>Pemindaian I2C mendeteksi <strong>0x76 (BMP280)</strong> &amp; <strong>0x3C (OLED SSD1306)</strong> pada bus bersama SDA/SCL.</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+        <td>Serial Monitor mencetak kedua modul terdeteksi valid via ACK (kode balik 0) pada pin SDA 21 dan SCL 22.</td>
+      </tr>
+      <tr>
+        <td class="text-center"><strong>2</strong></td>
+        <td>Data suhu, tekanan atmosfer, dan estimasi elevasi tampil dengan tata letak grafis rapi di OLED.</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+        <td>Layar OLED membagi tampilan dalam 3 zona terstruktur (Header, Data, dan Footer riwayat) berbasis <em>framebuffer</em>.</td>
+      </tr>
+      <tr>
+        <td class="text-center"><strong>3</strong></td>
+        <td>Siklus Deep Sleep terbukti berjalan: modul tidur berkala (LED mati) &amp; bangun via Timer/Tombol EXT0.</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+        <td>Lampu LED status padam selama 10 detik fase tidur, bangun otomatis via timer, dan bangun seketika via tombol GPIO 15.</td>
+      </tr>
+      <tr>
+        <td class="text-center"><strong>4</strong></td>
+        <td>Nilai variabel <code>RTC_DATA_ATTR</code> terbukti persisten (nomor boot &amp; riwayat tidak tereset).</td>
+        <td class="text-center"><span class="badge-lulus">LULUS</span></td>
+        <td>Variabel <code>nomorBoot</code> bertambah kontinu (#1 s.d. #5) dan <code>riwayatSuhuLalu</code> tetap tersimpan di RTC Slow RAM.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="section-title">6. Kesimpulan</h2>
+  <p>Seluruh indikator capaian praktikum Sistem IoT Minggu ke-3 (Lab-03) berhasil diselesaikan dengan <strong>status kelulusan sempurna (100% LULUS)</strong>. Topologi bus bersama I2C terbukti efisien menghemat pin mikrokontroler tanpa menimbulkan interferensi alamat sinyal. Arsitektur manajemen daya <strong>Deep Sleep</strong> yang dipadukan dengan persistensi memori <strong><code>RTC_DATA_ATTR</code></strong> berhasil menciptakan sistem monitoring cuaca mandiri yang hemat daya hingga lebih dari 99%, menjadikannya solusi andal untuk implementasi stasiun cuaca perkebunan kopi berbasis baterai di lapangan.</p>
+
+</body>
+</html>

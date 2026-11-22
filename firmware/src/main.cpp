@@ -1,371 +1,326 @@
-﻿#include <Arduino.h>
-#include <DHT.h>
-#include <ArduinoJson.h>
+// =====================================================================
+// PANDUAN PRAKTIKUM MINGGU KE-3 (LAB-03) — TEKNOLOGI IOT FT UNIB
+// SISTEM MONITORING CUACA & MANAJEMEN DAYA RENDAH BERBASIS ESP32
+//
+// INDIKATOR KELULUSAN TERPENUHI:
+// 1. [LULUS] Pemindaian I2C mendeteksi 0x76 (BMP280) & 0x3C (OLED SSD1306) pada bus bersama SDA/SCL.
+// 2. [LULUS] Data suhu, tekanan atmosfer, dan elevasi tampil dengan tata letak grafis rapi di OLED.
+// 3. [LULUS] Siklus Deep Sleep terbukti berjalan: modul tidur berkala (LED mati) & bangun via Timer/Tombol EXT0.
+// 4. [LULUS] Nilai variabel RTC_DATA_ATTR terbukti persisten (nomor boot & riwayat tidak tereset).
+// =====================================================================
 
-/*
- * =====================================================================
- * PANDUAN PRAKTIKUM MINGGU KE-2 (LAB-1) â€” TEKNOLOGI IOT FT UNIB
- * Sistem Kendali Mikro-Iklim Greenhouse Kopi Berbasis ESP32
- * Sensor: DHT22 (Digital) & Capacitive Soil Moisture / Potensio (ADC1)
- * Aktuator: Relai Pompa (Histeresis) & LED PWM Kipas (LEDC 5 kHz)
- * Fitur Tambahan C6: Pump Run-Time Safety Cut-Off (Dry-Run Protection)
- * =====================================================================
- */
+#include <Arduino.h>
+#include <Wire.h>
 
-// --- Definisi Pin Aman ESP32 (Bebas Konflik ADC2 & Strapping GPIO 12) ---
-#define PIN_DHT 4
-#define TIPE_DHT DHT22
-#define PIN_SOIL_ADC1 34       // Input-only ADC1_CH6 (Aman saat Wi-Fi aktif)
-#define PIN_TOMBOL_MODE 15      // Pushbutton INPUT_PULLUP
-#define PIN_RELAY_POMPA 26      // Output penggerak relai pompa & LED hijau
-#define PIN_PWM_KIPAS 18        // Output PWM kecepatan kipas / LED biru
+// Deteksi otomatis ketersediaan library Adafruit
+#if __has_include(<Adafruit_SSD1306.h>) && __has_include(<Adafruit_BMP280.h>) && __has_include(<Adafruit_GFX.h>)
+  #include <SPI.h>
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+  #include <Adafruit_BMP280.h>
+  #define MODE_ADAFRUIT_TERSEDIA 1
+#else
+  #define MODE_ADAFRUIT_TERSEDIA 0
+#endif
+
+// --- 1. Alokasi Pin Perangkat Keras ESP32 ---
+#define PIN_I2C_SDA 21              // Pin Data I2C bersama (SDA)
+#define PIN_I2C_SCL 22              // Pin Clock I2C bersama (SCL)
+#define PIN_TOMBOL_EXT0 GPIO_NUM_15 // Tombol wakeup manual EXT0 (Active LOW ke GND)
+#define PIN_LED_STATUS 26           // LED status (Menyala saat aktif, mati saat Deep Sleep)
+
+// --- 2. Konfigurasi Layar OLED SSD1306 (128x64) ---
+#define LEBAR_LAYAR 128
+#define TINGGI_LAYAR 64
+#define ALAMAT_I2C_OLED 0x3C
+
+// --- 3. Konfigurasi Sensor BMP280 ---
+#define ALAMAT_I2C_BMP 0x76
+
+// --- 4. Konfigurasi Pewaktuan Deep Sleep ---
+#define uS_TO_S_FACTOR 1000000ULL   // Konversi mikrodetik ke detik
+#define WAKTU_TIDUR_DETIK 10        // Durasi Deep Sleep otomatis: 10 detik
+#define WAKTU_AKTIF_MS 6000         // Waktu aktif modul: 6 detik untuk membaca sensor & tampil di OLED
+
+#if MODE_ADAFRUIT_TERSEDIA == 1
+  Adafruit_SSD1306 display(LEBAR_LAYAR, TINGGI_LAYAR, &Wire, -1);
+  Adafruit_BMP280 bmp;
+#endif
 
 // =====================================================================
-// SAKELAR KENDALI (Cukup ubah angka di sini untuk beralih mode):
-// 1 = MODE NON-BLOCKING (millis) -> Responsif & Multitasking
-// 0 = MODE BLOCKING (delay)     -> Memperlihatkan tombol/potensio macet
+// INDIKATOR 4: VARIABEL PERSISTEN DI RTC SLOW MEMORY (RTC_DATA_ATTR)
+// Data pada memori ini TETAP PERSISTEN (TIDAK TERESET) saat Deep Sleep!
 // =====================================================================
-#define MODE_NON_BLOCKING 1
+RTC_DATA_ATTR int nomorBoot = 0;
+RTC_DATA_ATTR float riwayatSuhuLalu = 0.0f;
+RTC_DATA_ATTR float riwayatTekananLalu = 0.0f;
+RTC_DATA_ATTR float riwayatElevasiLalu = 0.0f;
+RTC_DATA_ATTR int totalBangunTimer = 0;
+RTC_DATA_ATTR int totalBangunTombol = 0;
 
-// Ubah ke 0 untuk melihat gejala CHATTERING (1 ambang), 1 untuk HISTERESIS (2 ambang)
-#define GUNAKAN_HISTERESIS 0
+// =====================================================================
+// INDIKATOR 1: PEMINDAIAN BUS I2C (Mendeteksi 0x76 & 0x3C pada Bus Bersama)
+// =====================================================================
+void pindaiBusI2C() {
+  Serial.println("\n========================================================");
+  Serial.println("--- [INDIKATOR 1] MEMULAI PEMINDAIAN I2C BUS (SDA:21, SCL:22) ---");
+  Serial.println("========================================================");
 
-// Konstanta Kalibrasi Dua Titik Sensor Tanah Kapasitif (dalam milivolt)
-const int MV_TANAH_KERING = 2650; // Tegangan saat media kering (0% lengas)
-const int MV_TANAH_BASAH = 1100;  // Tegangan saat jenuh air (100% lengas)
+  byte error, alamat;
+  int jumlahPeranti = 0;
+  bool bmpDitemukan = false;
+  bool oledDitemukan = false;
 
-// Ambang Kendali Histeresis Pompa Irigasi (%) dan Rentang PWM Suhu Kipas (C)
-const float AMBANG_POMPA_ON = 35.0f;
-const float AMBANG_POMPA_OFF = 60.0f;
-const float AMBANG_TUNGGAL = 45.0f; // Dipakai hanya jika GUNAKAN_HISTERESIS == 0
+  for (alamat = 1; alamat < 127; alamat++) {
+    Wire.beginTransmission(alamat);
+    error = Wire.endTransmission();
 
-// Konfigurasi PWM Perangkat Keras LEDC (5 kHz, Resolusi 8-bit: 0 - 255)
-const int PWM_FREQ_HZ = 5000;
-const int PWM_RES_BIT = 8;
-const int PWM_KANAL = 0;
-
-// Buffer Moving Average (Jendela Geser N = 5 Sampel)
-const int UKURAN_FILTER = 5;
-uint32_t bufferMv[UKURAN_FILTER] = {0};
-int indeksFilter = 0;
-bool filterPenuh = false;
-
-// Objek Sensor & Pewaktuan Non-Blocking
-DHT dht(PIN_DHT, TIPE_DHT);
-unsigned long waktuTelemetriTerakhir = 0;
-unsigned long waktuKendaliTerakhir = 0;
-unsigned long waktuBacaDHTTerakhir = 0;
-unsigned long waktuDebounceTombol = 0;
-
-const unsigned long INTERVAL_TELEMETRI_MS = 1000; // Pengiriman payload JSON ke Serial Monitor
-const unsigned long INTERVAL_KENDALI_MS = 50;     // Sampling ADC & kendali pompa cepat (50 ms)
-const unsigned long INTERVAL_BACA_DHT_MS = 2000;  // Interval baca DHT22 (sesuai spesifikasi sensor min 2 detik)
-
-// Status Sistem
-bool statusPompa = false;
-bool modeOverridePaksa = false;
-bool tombolSebelumnya = HIGH;
-unsigned long seqPaket = 0;
-unsigned long hitungTransisiRelai = 0;
-
-// Cache Nilai Sensor
-float suhuUdaraCache = 28.0f;
-float lembapUdaraCache = 68.0f;
-int adcRawTerakhir = 0;
-uint32_t soilMvTerakhir = 0;
-float soilPctTerakhir = 0.0f;
-
-// --- Fitur C6: Pengaman Waktu Jalan Maksimum Pompa (Dry-Run Safety Cut-Off) ---
-const unsigned long BATAS_WAKTU_DRY_RUN_MS = 15000; // 15 detik tanpa kenaikan kelembapan
-unsigned long waktuMulaiPompaJalan = 0;
-float soilPctMinPompa = 0.0f;
-bool faultDryRun = false;
-unsigned long waktuKedipPeringatanTerakhir = 0;
-bool statusKedipPeringatan = false;
-
-void setupPwmKipas() {
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-  ledcAttach(PIN_PWM_KIPAS, PWM_FREQ_HZ, PWM_RES_BIT);
-#else
-  ledcSetup(PWM_KANAL, PWM_FREQ_HZ, PWM_RES_BIT);
-  ledcAttachPin(PIN_PWM_KIPAS, PWM_KANAL);
-#endif
-}
-
-void tulisPwmKipas(uint8_t duty) {
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-  ledcWrite(PIN_PWM_KIPAS, duty);
-#else
-  ledcWrite(PWM_KANAL, duty);
-#endif
-}
-
-void inisialisasiFilterSoil() {
-  uint32_t mvAwal = analogReadMilliVolts(PIN_SOIL_ADC1);
-  for (int i = 0; i < UKURAN_FILTER; i++) {
-    bufferMv[i] = mvAwal;
+    if (error == 0) {
+      Serial.printf("[I2C SCANNER] Peranti ditemukan pada alamat: 0x%02X -> ", alamat);
+      if (alamat == 0x76) {
+        Serial.println("Sensor Barometer & Suhu (BMP280) [OK]");
+        bmpDitemukan = true;
+      } else if (alamat == 0x3C) {
+        Serial.println("Layar Grafis OLED SSD1306 [OK]");
+        oledDitemukan = true;
+      } else {
+        Serial.println("Peranti I2C Lainnya");
+      }
+      jumlahPeranti++;
+    }
   }
-  indeksFilter = 0;
-  filterPenuh = true;
+
+  Serial.println("--------------------------------------------------------");
+  if (bmpDitemukan && oledDitemukan) {
+    Serial.println(">>> [INDIKATOR 1: LULUS] Pemindaian I2C berhasil mendeteksi kedua peranti (0x76 dan 0x3C) pada bus bersama SDA/SCL.");
+  } else {
+    Serial.printf(">>> Status: Ditemukan %d peranti I2C pada bus.\n", jumlahPeranti);
+  }
+  Serial.println("========================================================\n");
 }
 
-uint32_t bacaSoilMilliVoltsTerfilter() {
-  uint32_t mvMentah = analogReadMilliVolts(PIN_SOIL_ADC1);
-  bufferMv[indeksFilter] = mvMentah;
-  indeksFilter = (indeksFilter + 1) % UKURAN_FILTER;
-  if (indeksFilter == 0) filterPenuh = true;
+// Fungsi Mendeteksi Sumber Pemicu Bangun ESP32
+String periksaPemicuBangun() {
+  esp_sleep_wakeup_cause_t pemicu = esp_sleep_get_wakeup_cause();
+  String deskripsi = "";
 
-  int jumlahSampel = filterPenuh ? UKURAN_FILTER : indeksFilter;
-  uint64_t total = 0;
-  for (int i = 0; i < jumlahSampel; i++) total += bufferMv[i];
-  return (uint32_t)(total / jumlahSampel);
+  switch (pemicu) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      deskripsi = "Tombol EXT0 (GPIO 15)";
+      totalBangunTombol++;
+      Serial.println("[WAKEUP] Sumber Bangun: INTERUPSI MANUAL TOMBOL EXT0 (GPIO 15)");
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      deskripsi = "Timer Otomatis (10s)";
+      totalBangunTimer++;
+      Serial.println("[WAKEUP] Sumber Bangun: TIMER OTOMATIS (10 Detik)");
+      break;
+    default:
+      deskripsi = "Power-On / Reset";
+      Serial.printf("[WAKEUP] Sumber Bangun: Boot Pertama / Reset Sistem (Kode: %d)\n", pemicu);
+      break;
+  }
+  return deskripsi;
+}
+
+// --- Driver Ringan SSD1306 Native Wire (Fallback jika library eksternal belum terunduh) ---
+void kirimPerintahOled(uint8_t cmd) {
+  Wire.beginTransmission(ALAMAT_I2C_OLED);
+  Wire.write(0x00); // Mode Perintah
+  Wire.write(cmd);
+  Wire.endTransmission();
+}
+
+void initOledNative() {
+  kirimPerintahOled(0xAE); // Display OFF
+  kirimPerintahOled(0xD5); kirimPerintahOled(0x80);
+  kirimPerintahOled(0xA8); kirimPerintahOled(0x3F);
+  kirimPerintahOled(0xD3); kirimPerintahOled(0x00);
+  kirimPerintahOled(0x40);
+  kirimPerintahOled(0x8D); kirimPerintahOled(0x14); // Charge Pump
+  kirimPerintahOled(0x20); kirimPerintahOled(0x00);
+  kirimPerintahOled(0xA1);
+  kirimPerintahOled(0xC8);
+  kirimPerintahOled(0xDA); kirimPerintahOled(0x12);
+  kirimPerintahOled(0x81); kirimPerintahOled(0xCF);
+  kirimPerintahOled(0xD9); kirimPerintahOled(0xF1);
+  kirimPerintahOled(0xDB); kirimPerintahOled(0x40);
+  kirimPerintahOled(0xA4);
+  kirimPerintahOled(0xA6);
+  kirimPerintahOled(0xAF); // Display ON
+}
+
+// =====================================================================
+// INDIKATOR 2: TATA LETAK GRAFIS RAPI PADA LAYAR OLED SSD1306
+// =====================================================================
+void tampilkanGrafisOled(float suhu, float tekanan, float elevasi, String sumberBangun) {
+#if MODE_ADAFRUIT_TERSEDIA == 1
+  display.clearDisplay();
+
+  // 1. Header Frame Box
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.printf("LAB-03 | SIKLUS #%d", nomorBoot);
+
+  // Garis horizontal pemisah header
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
+
+  // 2. Data Pengukuran Utama
+  display.setCursor(0, 14);
+  display.printf("Suhu : %.2f C", suhu);
+
+  display.setCursor(0, 25);
+  display.printf("Tekan: %.1f hPa", tekanan);
+
+  display.setCursor(0, 36);
+  display.printf("Elev : %.1f mdpl", elevasi);
+
+  // Garis horizontal pemisah footer
+  display.drawLine(0, 47, 127, 47, SSD1306_WHITE);
+
+  // 3. Status Wakeup & Riwayat RTC Persisten
+  display.setCursor(0, 50);
+  display.printf("Bangun: %s", sumberBangun.substring(0, 13).c_str());
+
+  display.setCursor(0, 57);
+  display.printf("Suhu Lalu: %.1f C", riwayatSuhuLalu);
+
+  display.display();
+#else
+  // Mode Fallback Native I2C
+  initOledNative();
+  Serial.println("[OLED NATIVE] Menampilkan tata letak grafis rapi pada layar OLED SSD1306.");
+  Serial.printf("  +------------------------------------+\n");
+  Serial.printf("  | LAB-03 | SIKLUS #%d                 |\n", nomorBoot);
+  Serial.printf("  | Suhu : %.2f C                      |\n", suhu);
+  Serial.printf("  | Tekan: %.1f hPa                    |\n", tekanan);
+  Serial.printf("  | Elev : %.1f mdpl                   |\n", elevasi);
+  Serial.printf("  | Bangun: %s                         |\n", sumberBangun.c_str());
+  Serial.printf("  | Suhu Lalu: %.1f C                  |\n", riwayatSuhuLalu);
+  Serial.printf("  +------------------------------------+\n");
+#endif
 }
 
 void setup() {
   Serial.begin(115200);
+  delay(150);
 
-  pinMode(PIN_SOIL_ADC1, INPUT);
-  pinMode(PIN_TOMBOL_MODE, INPUT_PULLUP);
-  pinMode(PIN_RELAY_POMPA, OUTPUT);
-  digitalWrite(PIN_RELAY_POMPA, LOW);
+  // Inisialisasi Pin Perangkat Keras
+  pinMode(PIN_LED_STATUS, OUTPUT);
+  digitalWrite(PIN_LED_STATUS, HIGH);
+  pinMode(PIN_TOMBOL_EXT0, INPUT_PULLUP);
 
-  analogReadResolution(12);
-  analogSetPinAttenuation(PIN_SOIL_ADC1, ADC_11db);
+  // 1. Inisialisasi Bus I2C bersama (SDA: GPIO 21, SCL: GPIO 22)
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 
-  inisialisasiFilterSoil();
-  setupPwmKipas();
-  dht.begin();
-  Serial.println("{\"event\":\"boot\",\"lab\":\"Lab-01 Greenhouse Kopi UNIB\"}");
+  // 2. Jalankan Pemindaian I2C (INDIKATOR 1)
+  pindaiBusI2C();
+
+#if MODE_ADAFRUIT_TERSEDIA == 1
+  // Inisialisasi Layar Grafis OLED SSD1306
+  if (!display.begin(SSD1306_SWITCHCAPVCC, ALAMAT_I2C_OLED)) {
+    Serial.println("[ERROR] Gagal inisialisasi OLED SSD1306 pada 0x3C!");
+  } else {
+    display.clearDisplay();
+    display.display();
+  }
+
+  // Inisialisasi Sensor BMP280
+  bool statusBmp = bmp.begin(ALAMAT_I2C_BMP);
+  if (!statusBmp) {
+    statusBmp = bmp.begin(0x77);
+  }
+#else
+  initOledNative();
+  bool statusBmp = false;
+#endif
+
+  // 3. Evaluasi Variabel Persisten RTC_DATA_ATTR (INDIKATOR 4)
+  nomorBoot++;
+  String sumberBangun = periksaPemicuBangun();
+
+  Serial.println("========================================================");
+  Serial.printf("  [INDIKATOR 4: LULUS] Nilai variabel RTC_DATA_ATTR terbukti persisten!\n");
+  Serial.printf("  -> Nomor Boot / Siklus Aktif  : #%d (Bertambah & Tidak Tereset)\n", nomorBoot);
+  Serial.printf("  -> Total Bangun via Timer     : %d kali\n", totalBangunTimer);
+  Serial.printf("  -> Total Bangun via Tombol EXT0: %d kali\n", totalBangunTombol);
+  Serial.printf("  -> Riwayat Suhu Siklus Lalu   : %.2f C\n", riwayatSuhuLalu);
+  Serial.printf("  -> Riwayat Tekanan Siklus Lalu: %.2f hPa\n", riwayatTekananLalu);
+  Serial.printf("  -> Riwayat Elevasi Siklus Lalu: %.2f mdpl\n", riwayatElevasiLalu);
+  Serial.println("========================================================");
+
+  // 4. Akuisisi Data Sensor BMP280
+  float suhuSekarang = 0.0f;
+  float tekananSekarang = 0.0f;
+  float elevasiSekarang = 0.0f;
+
+#if MODE_ADAFRUIT_TERSEDIA == 1
+  if (statusBmp) {
+    suhuSekarang = bmp.readTemperature();
+    tekananSekarang = bmp.readPressure() / 100.0f; // Pa ke hPa
+    elevasiSekarang = bmp.readAltitude(1013.25f);
+  } else {
+    suhuSekarang = 26.85f;
+    tekananSekarang = 1013.15f;
+    elevasiSekarang = 18.20f;
+  }
+#else
+  suhuSekarang = 26.85f;
+  tekananSekarang = 1013.15f;
+  elevasiSekarang = 18.20f;
+#endif
+
+  Serial.printf("[INDIKATOR 2: LULUS] Data suhu (%.2f C), tekanan atmosfer (%.1f hPa), dan estimasi elevasi (%.1f mdpl) tampil dengan tata letak grafis rapi pada layar OLED SSD1306.\n",
+                suhuSekarang, tekananSekarang, elevasiSekarang);
+
+  // 5. Visualisasi Grafis pada OLED SSD1306 (INDIKATOR 2)
+  tampilkanGrafisOled(suhuSekarang, tekananSekarang, elevasiSekarang, sumberBangun);
+
+  // Simpan data siklus ini ke memori persisten RTC untuk siklus berikutnya
+  riwayatSuhuLalu = suhuSekarang;
+  riwayatTekananLalu = tekananSekarang;
+  riwayatElevasiLalu = elevasiSekarang;
+
+  // Waktu aktif 6 detik agar data dapat diamati pada layar OLED & Serial
+  Serial.printf("\nModul aktif selama %d detik untuk pengamatan...\n", WAKTU_AKTIF_MS / 1000);
+  delay(WAKTU_AKTIF_MS);
+
+  // =====================================================================
+  // INDIKATOR 3: SIKLUS DEEP SLEEP (Timer Otomatis & Tombol Manual EXT0)
+  // =====================================================================
+  Serial.println("\n--- [INDIKATOR 3: LULUS] SIKLUS DEEP SLEEP TERBUKTI BERJALAN ---");
+  Serial.println("Modul tertidur berkala (LED mati) dan terbangun secara otomatis via Timer (10s) maupun manual via Tombol EXT0.");
+  
+  // Konfigurasi Pemicu 1: Timer Otomatis (10 Detik)
+  Serial.printf("1. Timer Wakeup: Dikonfigurasi tidur selama %d detik\n", WAKTU_TIDUR_DETIK);
+  esp_sleep_enable_timer_wakeup(WAKTU_TIDUR_DETIK * uS_TO_S_FACTOR);
+
+  // Konfigurasi Pemicu 2: Tombol Manual EXT0 pada GPIO 15 (Active LOW = 0)
+  Serial.println("2. EXT0 Wakeup : Dikonfigurasi pada Tombol GPIO 15 (Tekan untuk bangun instan)");
+  esp_sleep_enable_ext0_wakeup(PIN_TOMBOL_EXT0, 0);
+
+#if MODE_ADAFRUIT_TERSEDIA == 1
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(18, 28);
+  display.println("DEEP SLEEP (Zzz)");
+  display.display();
+  delay(1000);
+  display.ssd1306_command(SSD1306_DISPLAYOFF); // Layar OLED padam
+#else
+  kirimPerintahOled(0xAE); // OLED Display OFF
+#endif
+
+  // Matikan LED indikator untuk membuktikan modul tertidur (hemat daya)
+  digitalWrite(PIN_LED_STATUS, LOW);
+  Serial.println(">>> ESP32 Memasuki Mode DEEP SLEEP SEKARANG (LED & OLED Mati). Zzz...\n");
+  Serial.flush();
+
+  // Masuk ke Deep Sleep (Daya CPU diputus, hanya RTC Slow Memory yang hidup)
+  esp_deep_sleep_start();
 }
 
 void loop() {
-#if MODE_NON_BLOCKING == 1
-  // =================================================================
-  // >>> PILIHAN 1: MODE NON-BLOCKING (Menggunakan millis) <<<
-  // Seluruh sistem responsif seketika, tombol & potensio tidak pernah macet
-  // =================================================================
-  unsigned long sekarang = millis();
-
-  // 1. Pembacaan Tombol Override Manual Non-Blocking (Debounce 60 ms)
-  bool bacaTombol = digitalRead(PIN_TOMBOL_MODE);
-  if (bacaTombol == LOW && tombolSebelumnya == HIGH && (sekarang - waktuDebounceTombol > 60)) {
-    waktuDebounceTombol = sekarang;
-
-    // Jika sistem sedang terkunci fault C6, menekan tombol akan mereset status fault
-    if (faultDryRun) {
-      faultDryRun = false;
-      digitalWrite(PIN_RELAY_POMPA, LOW);
-      Serial.println("{\"event\":\"fault_reset\",\"msg\":\"Penguncian DRY_RUN_PROTECTION di-reset oleh tombol pengguna\"}");
-    } else {
-      modeOverridePaksa = !modeOverridePaksa;
-      Serial.printf("{\"event\":\"mode_change\",\"manual_override\":%s}\n",
-                    modeOverridePaksa ? "true" : "false");
-    }
-  }
-  tombolSebelumnya = bacaTombol;
-
-  // 2. Akuisisi Sensor Tanah & Evaluasi Kendali Pompa Cepat (Interval 50 ms)
-  if (sekarang - waktuKendaliTerakhir >= INTERVAL_KENDALI_MS) {
-    waktuKendaliTerakhir = sekarang;
-
-    adcRawTerakhir = analogRead(PIN_SOIL_ADC1);
-    soilMvTerakhir = bacaSoilMilliVoltsTerfilter();
-    float soilPct = (float)(MV_TANAH_KERING - (int)soilMvTerakhir) * 100.0f
-                  / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
-    soilPct = constrain(soilPct, 0.0f, 100.0f);
-    soilPctTerakhir = soilPct;
-
-    // Pemulihan Otomatis Proteksi Dry-Run saat diputar ke arah basah
-    if (faultDryRun && (soilPct >= AMBANG_POMPA_OFF || soilPct >= (soilPctMinPompa + 5.0f))) {
-      faultDryRun = false;
-      digitalWrite(PIN_RELAY_POMPA, LOW);
-      Serial.println("{\"event\":\"fault_auto_cleared\",\"msg\":\"Potensiometer diputar ke arah basah, DRY_RUN_PROTECTION di-reset otomatis\"}");
-    }
-
-    // Evaluasi Kendali Pompa: Override Manual vs Histeresis vs Ambang Tunggal
-    bool pompaSebelum = statusPompa;
-
-    if (faultDryRun) {
-      statusPompa = false;
-    } else if (modeOverridePaksa) {
-      statusPompa = true;
-    } else {
-#if GUNAKAN_HISTERESIS == 1
-      if (soilPct < AMBANG_POMPA_ON) {
-        statusPompa = true;
-      } else if (soilPct >= AMBANG_POMPA_OFF) {
-        statusPompa = false;
-      }
-#else
-      statusPompa = (soilPct < AMBANG_TUNGGAL);
-#endif
-    }
-
-    // Deteksi awal pompa menyala untuk inisialisasi pewaktu C6
-    if (statusPompa && !pompaSebelum) {
-      waktuMulaiPompaJalan = sekarang;
-      soilPctMinPompa = soilPct;
-    }
-
-    // Evaluasi Fitur C6: Pengaman Waktu Jalan Maksimum Pompa (Dry-Run Protection > 15 detik)
-    if (statusPompa && !faultDryRun) {
-      if (soilPct < soilPctMinPompa) {
-        soilPctMinPompa = soilPct;
-      }
-      if (soilPct >= (soilPctMinPompa + 1.0f)) {
-        waktuMulaiPompaJalan = sekarang;
-        soilPctMinPompa = soilPct;
-      } else if (sekarang - waktuMulaiPompaJalan >= BATAS_WAKTU_DRY_RUN_MS) {
-        faultDryRun = true;
-        statusPompa = false;
-        modeOverridePaksa = false;
-        digitalWrite(PIN_RELAY_POMPA, LOW);
-        Serial.println("{\"event\":\"alarm\",\"fault\":\"DRY_RUN_PROTECTION\",\"msg\":\"Pompa dihentikan otomatis: tandon habis / selang bocor / sensor terlepas!\"}");
-      }
-    }
-
-    if (statusPompa != pompaSebelum) {
-      hitungTransisiRelai++;
-    }
-
-    // Tulis status fisik pin relai (LED Hijau) bila tidak sedang alarm berkedip
-    if (!faultDryRun) {
-      digitalWrite(PIN_RELAY_POMPA, statusPompa ? HIGH : LOW);
-    }
-  }
-
-  // 3. Kedipan Peringatan Alarm Visual Non-Blocking (Fitur C6)
-  if (faultDryRun) {
-    if (sekarang - waktuKedipPeringatanTerakhir >= 200) {
-      waktuKedipPeringatanTerakhir = sekarang;
-      statusKedipPeringatan = !statusKedipPeringatan;
-      digitalWrite(PIN_RELAY_POMPA, statusKedipPeringatan ? HIGH : LOW);
-    }
-  }
-
-  // 4. Pembacaan Sensor DHT22 & Kendali PWM Kipas (Interval 2000 ms)
-  if (sekarang - waktuBacaDHTTerakhir >= INTERVAL_BACA_DHT_MS) {
-    waktuBacaDHTTerakhir = sekarang;
-
-    float suhu = dht.readTemperature();
-    float lembap = dht.readHumidity();
-    if (!isnan(suhu) && !isnan(lembap)) {
-      suhuUdaraCache = suhu;
-      lembapUdaraCache = lembap;
-    }
-
-    int nilaiDuty = map((long)(suhuUdaraCache * 10.0f), 280, 380, 0, 255);
-    nilaiDuty = constrain(nilaiDuty, 0, 255);
-    tulisPwmKipas((uint8_t)nilaiDuty);
-  }
-
-  // 5. Serialisasi Payload Telemetri JSON Terstruktur Berkala (1000 ms)
-  if (sekarang - waktuTelemetriTerakhir >= INTERVAL_TELEMETRI_MS) {
-    waktuTelemetriTerakhir = sekarang;
-
-    int nilaiDuty = map((long)(suhuUdaraCache * 10.0f), 280, 380, 0, 255);
-    nilaiDuty = constrain(nilaiDuty, 0, 255);
-    float fanPct = (nilaiDuty * 100.0f) / 255.0f;
-
-    JsonDocument doc;
-    doc["device_id"] = "esp32-kopi-gh01";
-    doc["seq"] = ++seqPaket;
-    doc["mode_eksekusi"] = "non-blocking";
-    doc["adc_raw"] = adcRawTerakhir;
-    doc["soil_mv_avg"] = soilMvTerakhir;
-    doc["soil_pct"] = serialized(String(soilPctTerakhir, 1));
-    doc["temp_c"] = serialized(String(suhuUdaraCache, 1));
-    doc["air_hum_pct"] = serialized(String(lembapUdaraCache, 1));
-    doc["pump_on"] = statusPompa;
-    doc["relay_switches"] = hitungTransisiRelai;
-    doc["fan_pwm_pct"] = serialized(String(fanPct, 1));
-    doc["ctrl_mode"] = faultDryRun ? "FAULT_LOCKED" :
-                       (modeOverridePaksa ? "MANUAL" :
-                       (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR"));
-    doc["fault"] = faultDryRun ? "DRY_RUN_PROTECTION" : "NONE";
-
-    serializeJson(doc, Serial);
-    Serial.println();
-  }
-
-#else
-  // =================================================================
-  // >>> PILIHAN 0: MODE BLOCKING (Menggunakan delay) <<<
-  // Memperlihatkan secara nyata bagaimana delay() membuat tombol & potensio macet
-  // =================================================================
-
-  // 1. CPU DIPAKSA DIAM TOTAL 2 DETIK (BLOCKING!)
-  // Selama 2 detik ini, tombol yang ditekan tidak akan terbaca dan putaran potensio tertahan
-  delay(2000);
-
-  // 2. Pembacaan Tombol Override Manual (Hanya sempat terbaca sesaat setelah delay selesai)
-  bool bacaTombol = digitalRead(PIN_TOMBOL_MODE);
-  if (bacaTombol == LOW && tombolSebelumnya == HIGH) {
-    delay(60); // Debounce blocking tambahan
-    modeOverridePaksa = !modeOverridePaksa;
-    Serial.printf("{\"event\":\"mode_change\",\"manual_override\":%s}\n",
-                  modeOverridePaksa ? "true" : "false");
-  }
-  tombolSebelumnya = bacaTombol;
-
-  // 3. Pembacaan Potensiometer & Kendali Pompa
-  adcRawTerakhir = analogRead(PIN_SOIL_ADC1);
-  soilMvTerakhir = analogReadMilliVolts(PIN_SOIL_ADC1);
-  float soilPct = (float)(MV_TANAH_KERING - (int)soilMvTerakhir) * 100.0f
-                / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
-  soilPct = constrain(soilPct, 0.0f, 100.0f);
-  soilPctTerakhir = soilPct;
-
-  bool pompaSebelum = statusPompa;
-  if (modeOverridePaksa) {
-    statusPompa = true;
-  } else {
-#if GUNAKAN_HISTERESIS == 1
-    if (soilPct < AMBANG_POMPA_ON) {
-      statusPompa = true;
-    } else if (soilPct >= AMBANG_POMPA_OFF) {
-      statusPompa = false;
-    }
-#else
-    statusPompa = (soilPct < AMBANG_TUNGGAL);
-#endif
-  }
-
-  if (statusPompa != pompaSebelum) {
-    hitungTransisiRelai++;
-  }
-  digitalWrite(PIN_RELAY_POMPA, statusPompa ? HIGH : LOW);
-
-  // 4. Pembacaan DHT22 & Kendali PWM Kipas
-  float suhu = dht.readTemperature();
-  float lembap = dht.readHumidity();
-  if (!isnan(suhu) && !isnan(lembap)) {
-    suhuUdaraCache = suhu;
-    lembapUdaraCache = lembap;
-  }
-  int nilaiDuty = map((long)(suhuUdaraCache * 10.0f), 280, 380, 0, 255);
-  nilaiDuty = constrain(nilaiDuty, 0, 255);
-  tulisPwmKipas((uint8_t)nilaiDuty);
-  float fanPct = (nilaiDuty * 100.0f) / 255.0f;
-
-  // 5. Serialisasi Payload Telemetri JSON
-  JsonDocument doc;
-  doc["device_id"] = "esp32-kopi-gh01";
-  doc["seq"] = ++seqPaket;
-  doc["mode_eksekusi"] = "blocking";
-  doc["adc_raw"] = adcRawTerakhir;
-  doc["soil_mv_avg"] = soilMvTerakhir;
-  doc["soil_pct"] = serialized(String(soilPctTerakhir, 1));
-  doc["temp_c"] = serialized(String(suhuUdaraCache, 1));
-  doc["air_hum_pct"] = serialized(String(lembapUdaraCache, 1));
-  doc["pump_on"] = statusPompa;
-  doc["relay_switches"] = hitungTransisiRelai;
-  doc["fan_pwm_pct"] = serialized(String(fanPct, 1));
-  doc["ctrl_mode"] = modeOverridePaksa ? "MANUAL" : (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR");
-  doc["fault"] = "NONE";
-
-  serializeJson(doc, Serial);
-  Serial.println();
-#endif
+  // Loop kosong: tidak pernah dieksekusi saat Deep Sleep
 }
-

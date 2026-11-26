@@ -69,7 +69,9 @@ const unsigned long INTERVAL_BACA_DHT_MS = 2000;  // Interval baca DHT22 (sesuai
 
 // Status Sistem
 bool statusPompa = false;
-bool modeOverridePaksa = false;
+bool modeOverrideHidup = false; // Override paksa HIDUP dari tombol kuning
+bool modeOverrideMati = false;  // Override paksa MATI dari tombol kuning
+#define modeOverridePaksa (modeOverrideHidup)
 bool tombolSebelumnya = HIGH;
 unsigned long seqPaket = 0;
 unsigned long hitungTransisiRelai = 0;
@@ -173,12 +175,29 @@ void loop() {
     // Jika sistem sedang terkunci fault C6, menekan tombol akan mereset status fault
     if (faultDryRun) {
       faultDryRun = false;
+      modeOverrideMati = false;
+      modeOverrideHidup = false;
       digitalWrite(PIN_RELAY_POMPA, LOW);
       Serial.println("{\"event\":\"fault_reset\",\"msg\":\"Penguncian DRY_RUN_PROTECTION di-reset oleh tombol pengguna\"}");
     } else {
-      modeOverridePaksa = !modeOverridePaksa;
-      Serial.printf("{\"event\":\"mode_change\",\"manual_override\":%s}\n",
-                    modeOverridePaksa ? "true" : "false");
+      // Toggle Dua Arah:
+      // - Jika pompa sedang HIDUP -> Tekan tombol mematikan pompa (Manual Force OFF)
+      // - Jika pompa sedang MATI  -> Tekan tombol menyalakan pompa (Manual Force ON)
+      if (statusPompa) {
+        modeOverrideMati = true;
+        modeOverrideHidup = false;
+        statusPompa = false;
+        digitalWrite(PIN_RELAY_POMPA, LOW);
+        Serial.println("{\"event\":\"tombol_override\",\"aksi\":\"POMPA_DIMATIKAN\",\"msg\":\"Tombol kuning ditekan -> Pompa & LED Hijau DIMATIKAN seketika!\"}");
+      } else {
+        modeOverrideHidup = true;
+        modeOverrideMati = false;
+        statusPompa = true;
+        waktuMulaiPompaJalan = sekarang;
+        soilPctMinPompa = soilPctTerakhir;
+        digitalWrite(PIN_RELAY_POMPA, HIGH);
+        Serial.println("{\"event\":\"tombol_override\",\"aksi\":\"POMPA_DIHIDUPKAN\",\"msg\":\"Tombol kuning ditekan -> Pompa & LED Hijau DIHIDUPKAN secara manual!\"}");
+      }
     }
   }
   tombolSebelumnya = bacaTombol;
@@ -193,6 +212,8 @@ void loop() {
     // A. Deteksi jika pengguna memutar potensiometer secara manual di simulator (toleransi 35 mV)
     if (abs((int)mvPotAktual - (int)potMvTerakhirDisimpan) > 35) {
       potMvTerakhirDisimpan = mvPotAktual;
+      modeOverrideMati = false;  // Reset override manual agar kembali mengikuti putaran potensio
+      modeOverrideHidup = false;
       soilPctSimulasi = (float)(MV_TANAH_KERING - (int)mvPotAktual) * 100.0f
                       / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
       soilPctSimulasi = constrain(soilPctSimulasi, 0.0f, 100.0f);
@@ -239,8 +260,14 @@ void loop() {
 
     if (faultDryRun) {
       statusPompa = false;
-    } else if (modeOverridePaksa) {
-      statusPompa = true;
+    } else if (modeOverrideMati) {
+      statusPompa = false; // Dipaksa MATI oleh tombol kuning
+    } else if (modeOverrideHidup) {
+      statusPompa = true;  // Dipaksa HIDUP oleh tombol kuning
+      if (soilPct >= AMBANG_POMPA_OFF) {
+        modeOverrideHidup = false; // Pengaman: matikan override jika sudah basah
+        statusPompa = false;
+      }
     } else {
 #if GUNAKAN_HISTERESIS == 1
       if (soilPct < AMBANG_POMPA_ON) {
@@ -338,8 +365,9 @@ void loop() {
     doc["relay_switches"] = hitungTransisiRelai;
     doc["fan_pwm_pct"] = serialized(String(fanPct, 1));
     doc["ctrl_mode"] = faultDryRun ? "FAULT_LOCKED" :
-                       (modeOverridePaksa ? "MANUAL" :
-                       (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR"));
+                       (modeOverrideHidup ? "MANUAL_ON" :
+                       (modeOverrideMati ? "MANUAL_OFF" :
+                       (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR")));
     doc["fault"] = faultDryRun ? "DRY_RUN_PROTECTION" : "NONE";
 
     serializeJson(doc, Serial);
@@ -360,9 +388,19 @@ void loop() {
   bool bacaTombol = digitalRead(PIN_TOMBOL_MODE);
   if (bacaTombol == LOW && tombolSebelumnya == HIGH) {
     delay(60); // Debounce blocking tambahan
-    modeOverridePaksa = !modeOverridePaksa;
-    Serial.printf("{\"event\":\"mode_change\",\"manual_override\":%s}\n",
-                  modeOverridePaksa ? "true" : "false");
+    if (statusPompa) {
+      modeOverrideMati = true;
+      modeOverrideHidup = false;
+      statusPompa = false;
+      digitalWrite(PIN_RELAY_POMPA, LOW);
+      Serial.println("{\"event\":\"tombol_override\",\"aksi\":\"POMPA_DIMATIKAN\",\"msg\":\"Tombol kuning ditekan -> Pompa & LED Hijau DIMATIKAN seketika (Blocking)!\"}");
+    } else {
+      modeOverrideHidup = true;
+      modeOverrideMati = false;
+      statusPompa = true;
+      digitalWrite(PIN_RELAY_POMPA, HIGH);
+      Serial.println("{\"event\":\"tombol_override\",\"aksi\":\"POMPA_DIHIDUPKAN\",\"msg\":\"Tombol kuning ditekan -> Pompa & LED Hijau DIHIDUPKAN secara manual (Blocking)!\"}");
+    }
   }
   tombolSebelumnya = bacaTombol;
 
@@ -372,6 +410,8 @@ void loop() {
 #if SIMULASI_DINAMIKA_TANAH == 1
   if (abs((int)mvPotAktual - (int)potMvTerakhirDisimpan) > 35) {
     potMvTerakhirDisimpan = mvPotAktual;
+    modeOverrideMati = false;
+    modeOverrideHidup = false;
     soilPctSimulasi = (float)(MV_TANAH_KERING - (int)mvPotAktual) * 100.0f
                     / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
     soilPctSimulasi = constrain(soilPctSimulasi, 0.0f, 100.0f);
@@ -398,8 +438,14 @@ void loop() {
 #endif
 
   bool pompaSebelum = statusPompa;
-  if (modeOverridePaksa) {
+  if (modeOverrideMati) {
+    statusPompa = false;
+  } else if (modeOverrideHidup) {
     statusPompa = true;
+    if (soilPct >= AMBANG_POMPA_OFF) {
+      modeOverrideHidup = false;
+      statusPompa = false;
+    }
   } else {
 #if GUNAKAN_HISTERESIS == 1
     if (soilPct < AMBANG_POMPA_ON) {
@@ -448,7 +494,9 @@ void loop() {
   doc["pump_on"] = statusPompa;
   doc["relay_switches"] = hitungTransisiRelai;
   doc["fan_pwm_pct"] = serialized(String(fanPct, 1));
-  doc["ctrl_mode"] = modeOverridePaksa ? "MANUAL" : (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR");
+  doc["ctrl_mode"] = modeOverrideHidup ? "MANUAL_ON" :
+                     (modeOverrideMati ? "MANUAL_OFF" :
+                     (GUNAKAN_HISTERESIS ? "HYSTERESIS" : "SINGLE_THR"));
   doc["fault"] = "NONE";
 
   serializeJson(doc, Serial);

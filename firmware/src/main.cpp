@@ -28,7 +28,13 @@
 #define MODE_NON_BLOCKING 1
 
 // Ubah ke 0 untuk melihat gejala CHATTERING (1 ambang), 1 untuk HISTERESIS (2 ambang)
-#define GUNAKAN_HISTERESIS 0
+#define GUNAKAN_HISTERESIS 1
+
+// 1 = SIMULASI DINAMIKA AIR TANAH OTOMATIS AKTIF:
+// Saat pompa hidup -> Kelembapan tanah otomatis naik hingga mencapai 60% (pompa mati otomatis)
+// Saat pompa mati  -> Kelembapan perlahan menurun alami (evaporasi)
+// Catatan: Jika potensiometer diputar manual, sistem tetap langsung mengikuti putaran Anda!
+#define SIMULASI_DINAMIKA_TANAH 1
 
 // Konstanta Kalibrasi Dua Titik Sensor Tanah Kapasitif (dalam milivolt)
 const int MV_TANAH_KERING = 2650; // Tegangan saat media kering (0% lengas)
@@ -83,6 +89,12 @@ bool faultDryRun = false;
 unsigned long waktuKedipPeringatanTerakhir = 0;
 bool statusKedipPeringatan = false;
 
+// --- Fitur Simulasi Fisika Tanah Cerdas (Auto-Moisture Rise saat Pompa Aktif) ---
+float soilPctSimulasi = 28.0f;                  // Nilai lengas tanah aktif (%)
+uint32_t potMvTerakhirDisimpan = 0;             // Detektor gerakan fisik potensiometer
+unsigned long waktuDinamikaTanahTerakhir = 0;   // Pewaktu dinamika air tanah
+const unsigned long INTERVAL_DINAMIKA_MS = 250; // Kenaikan bertahap tiap 250 ms
+
 void setupPwmKipas() {
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
   ledcAttach(PIN_PWM_KIPAS, PWM_FREQ_HZ, PWM_RES_BIT);
@@ -135,6 +147,13 @@ void setup() {
   inisialisasiFilterSoil();
   setupPwmKipas();
   dht.begin();
+
+  // Inisialisasi basis kelembapan awal dari potensiometer
+  uint32_t mvAwal = bacaSoilMilliVoltsTerfilter();
+  potMvTerakhirDisimpan = mvAwal;
+  float pctAwal = (float)(MV_TANAH_KERING - (int)mvAwal) * 100.0f / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
+  soilPctSimulasi = constrain(pctAwal, 0.0f, 100.0f);
+
   Serial.println("{\"event\":\"boot\",\"lab\":\"Lab-01 Greenhouse Kopi UNIB\"}");
 }
 
@@ -168,12 +187,45 @@ void loop() {
   if (sekarang - waktuKendaliTerakhir >= INTERVAL_KENDALI_MS) {
     waktuKendaliTerakhir = sekarang;
 
+    uint32_t mvPotAktual = bacaSoilMilliVoltsTerfilter();
+
+#if SIMULASI_DINAMIKA_TANAH == 1
+    // A. Deteksi jika pengguna memutar potensiometer secara manual di simulator (toleransi 35 mV)
+    if (abs((int)mvPotAktual - (int)potMvTerakhirDisimpan) > 35) {
+      potMvTerakhirDisimpan = mvPotAktual;
+      soilPctSimulasi = (float)(MV_TANAH_KERING - (int)mvPotAktual) * 100.0f
+                      / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
+      soilPctSimulasi = constrain(soilPctSimulasi, 0.0f, 100.0f);
+    } else {
+      // B. Pengguna tidak memutar potensio -> Jalankan dinamika penyiraman tanah otomatis!
+      if (sekarang - waktuDinamikaTanahTerakhir >= INTERVAL_DINAMIKA_MS) {
+        waktuDinamikaTanahTerakhir = sekarang;
+        if (statusPompa && !faultDryRun) {
+          // Pompa HIDUP: Air disiram -> Kelembapan tanah otomatis naik bertahap (+0.5% per 250ms = +2.0% per detik)
+          soilPctSimulasi += 0.5f;
+          if (soilPctSimulasi > 85.0f) soilPctSimulasi = 85.0f;
+        } else if (!statusPompa && !modeOverridePaksa) {
+          // Pompa MATI: Pengeringan alami perlahan (-0.1% per 250ms = -0.4% per detik)
+          soilPctSimulasi -= 0.1f;
+          if (soilPctSimulasi < 20.0f) soilPctSimulasi = 20.0f;
+        }
+      }
+    }
+
+    float soilPct = constrain(soilPctSimulasi, 0.0f, 100.0f);
+    soilPctTerakhir = soilPct;
+
+    // Sinkronkan nilai estimasi milivolt dan ADC agar konsisten di telemetri
+    soilMvTerakhir = (uint32_t)constrain((int)(MV_TANAH_KERING - (soilPct * (MV_TANAH_KERING - MV_TANAH_BASAH) / 100.0f)), MV_TANAH_BASAH, MV_TANAH_KERING);
+    adcRawTerakhir = map(soilMvTerakhir, 0, 3300, 0, 4095);
+#else
     adcRawTerakhir = analogRead(PIN_SOIL_ADC1);
-    soilMvTerakhir = bacaSoilMilliVoltsTerfilter();
+    soilMvTerakhir = mvPotAktual;
     float soilPct = (float)(MV_TANAH_KERING - (int)soilMvTerakhir) * 100.0f
                   / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
     soilPct = constrain(soilPct, 0.0f, 100.0f);
     soilPctTerakhir = soilPct;
+#endif
 
     // Pemulihan Otomatis Proteksi Dry-Run saat diputar ke arah basah
     if (faultDryRun && (soilPct >= AMBANG_POMPA_OFF || soilPct >= (soilPctMinPompa + 5.0f))) {
@@ -226,6 +278,12 @@ void loop() {
 
     if (statusPompa != pompaSebelum) {
       hitungTransisiRelai++;
+      if (statusPompa) {
+        Serial.printf("{\"event\":\"pompa_on\",\"soil_pct\":%.1f,\"msg\":\"Tanah kering -> Pompa HIDUP, air mengalir, kelembapan mulai naik otomatis!\"}\n", soilPct);
+      } else {
+        Serial.printf("{\"event\":\"pompa_off\",\"soil_pct\":%.1f,\"msg\":\"Ambang batas tercapai (>=%.1f%%) -> Pompa MATI otomatis, tanah sudah cukup basah!\"}\n",
+                      soilPct, (GUNAKAN_HISTERESIS ? AMBANG_POMPA_OFF : AMBANG_TUNGGAL));
+      }
     }
 
     // Tulis status fisik pin relai (LED Hijau) bila tidak sedang alarm berkedip
@@ -309,12 +367,35 @@ void loop() {
   tombolSebelumnya = bacaTombol;
 
   // 3. Pembacaan Potensiometer & Kendali Pompa
+  uint32_t mvPotAktual = analogReadMilliVolts(PIN_SOIL_ADC1);
+
+#if SIMULASI_DINAMIKA_TANAH == 1
+  if (abs((int)mvPotAktual - (int)potMvTerakhirDisimpan) > 35) {
+    potMvTerakhirDisimpan = mvPotAktual;
+    soilPctSimulasi = (float)(MV_TANAH_KERING - (int)mvPotAktual) * 100.0f
+                    / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
+    soilPctSimulasi = constrain(soilPctSimulasi, 0.0f, 100.0f);
+  } else {
+    if (statusPompa) {
+      // Saat pompa aktif selama delay 2 detik, air mengalir -> kelembapan melonjak naik (+4.0%)
+      soilPctSimulasi = constrain(soilPctSimulasi + 4.0f, 0.0f, 85.0f);
+    } else {
+      soilPctSimulasi = constrain(soilPctSimulasi - 1.0f, 20.0f, 85.0f);
+    }
+  }
+
+  float soilPct = constrain(soilPctSimulasi, 0.0f, 100.0f);
+  soilPctTerakhir = soilPct;
+  soilMvTerakhir = (uint32_t)constrain((int)(MV_TANAH_KERING - (soilPct * (MV_TANAH_KERING - MV_TANAH_BASAH) / 100.0f)), MV_TANAH_BASAH, MV_TANAH_KERING);
+  adcRawTerakhir = map(soilMvTerakhir, 0, 3300, 0, 4095);
+#else
   adcRawTerakhir = analogRead(PIN_SOIL_ADC1);
-  soilMvTerakhir = analogReadMilliVolts(PIN_SOIL_ADC1);
+  soilMvTerakhir = mvPotAktual;
   float soilPct = (float)(MV_TANAH_KERING - (int)soilMvTerakhir) * 100.0f
                 / (float)(MV_TANAH_KERING - MV_TANAH_BASAH);
   soilPct = constrain(soilPct, 0.0f, 100.0f);
   soilPctTerakhir = soilPct;
+#endif
 
   bool pompaSebelum = statusPompa;
   if (modeOverridePaksa) {
@@ -333,6 +414,12 @@ void loop() {
 
   if (statusPompa != pompaSebelum) {
     hitungTransisiRelai++;
+    if (statusPompa) {
+      Serial.printf("{\"event\":\"pompa_on\",\"soil_pct\":%.1f,\"msg\":\"Tanah kering -> Pompa HIDUP, air mengalir, kelembapan mulai naik otomatis!\"}\n", soilPct);
+    } else {
+      Serial.printf("{\"event\":\"pompa_off\",\"soil_pct\":%.1f,\"msg\":\"Ambang batas tercapai (>=%.1f%%) -> Pompa MATI otomatis, tanah sudah cukup basah!\"}\n",
+                    soilPct, (GUNAKAN_HISTERESIS ? AMBANG_POMPA_OFF : AMBANG_TUNGGAL));
+    }
   }
   digitalWrite(PIN_RELAY_POMPA, statusPompa ? HIGH : LOW);
 
